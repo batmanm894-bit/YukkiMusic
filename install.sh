@@ -170,7 +170,6 @@ detect_system() {
     log_info "Detected system: $OS_TYPE ($ARCH_TYPE)"
 }
 
-# Usage: run_cmd_arr "description" cmd arg1 arg2 ...
 run_cmd_arr() {
     local desc="$1"
     shift
@@ -224,7 +223,6 @@ reload_shell_if_needed() {
     local profile
     for profile in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
         if [[ -f "$profile" ]]; then
-            # shellcheck disable=SC1090
             source "$profile" 2>/dev/null || true
             print_success "Environment reloaded from $profile"
             break
@@ -494,7 +492,6 @@ check_install_go() {
         macos)
             if command -v brew >/dev/null 2>&1; then
                 print_info "Installing/upgrading Go via Homebrew..."
-                # brew install is a no-op if already present; brew upgrade handles the rest.
                 run_cmd_arr "brew install go" brew install go
                 run_cmd_arr "brew upgrade go" brew upgrade go
 
@@ -634,7 +631,6 @@ check_install_ytdlp() {
             command -v yt-dlp >/dev/null 2>&1 && { print_success "yt-dlp installed via pip"; return 0; }
         fi
 
-        # Python 3.11+ externally-managed environments
         if run_cmd_arr "Installing yt-dlp (--break-system-packages)" \
             "$PYTHON_CMD" -m pip install -U yt-dlp --break-system-packages; then
             update_path "$HOME/.local/bin" "local bin"
@@ -709,10 +705,8 @@ install_ntgcalls() {
         if run_cmd_arr "Extracting ntgcalls" unzip -q ntgcalls.zip -d tmp_ntg; then
             mkdir -p ntgcalls
             cp tmp_ntg/include/ntgcalls.h ntgcalls/
-            local lib_file
-            lib_file=$(find tmp_ntg/lib -type f | head -n1)
-            if [[ -n "$lib_file" ]]; then
-                mv "$lib_file" "./$(basename "$lib_file")"
+            if find tmp_ntg/lib -type f | grep -q .; then
+                cp tmp_ntg/lib/* ./
                 print_success "ntgcalls installed"
                 rm -rf ntgcalls.zip tmp_ntg
                 return 0
