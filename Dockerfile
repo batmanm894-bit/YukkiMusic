@@ -10,15 +10,12 @@ RUN apt-get update && \
         zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-COPY go.mod ./
-RUN go mod tidy
+COPY go.mod go.sum ./
 COPY install.sh ./
 COPY . .
 
-COPY install.sh ./
-COPY . .
-
-RUN chmod +x install.sh && \
+RUN go mod tidy && \
+    chmod +x install.sh && \
     ./install.sh -n && \
     CGO_ENABLED=1 go build -v -trimpath -ldflags="-w -s" -o app ./cmd/app/
 
