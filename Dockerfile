@@ -11,7 +11,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY go.mod go.sum ./
-RUN go mod tidy
+RUN go mod tidy && go mod download
 
 COPY install.sh ./
 COPY . .
