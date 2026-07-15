@@ -99,9 +99,7 @@ func downloadCookieFile(url string) error {
 	rawURL := "https://batbin.me/raw/" + id
 	filePath := filepath.Join(cookieDir, id+".txt")
 
-	resp, err := client.R().
-    SetOutputFile(filePath).
-    Get(rawURL)
+	resp, err := client.R().Get(rawURL)
 	if err != nil {
 		return err
 	}
@@ -114,7 +112,7 @@ func downloadCookieFile(url string) error {
 		)
 	}
 
-	return nil
+	return os.WriteFile(filePath, resp.Bytes(), 0o600)
 }
 
 func loadCookieCache() error {
