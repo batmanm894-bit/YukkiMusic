@@ -100,7 +100,7 @@ func downloadCookieFile(url string) error {
 	filePath := filepath.Join(cookieDir, id+".txt")
 
 	resp, err := client.R().
-    SetOutput(filePath).
+    SetOutputFile(filePath).
     Get(rawURL)
 	if err != nil {
 		return err
