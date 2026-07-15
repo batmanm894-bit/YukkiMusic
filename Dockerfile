@@ -17,7 +17,7 @@ COPY install.sh ./
 COPY . .
 
 RUN chmod +x install.sh && \
-    ./install.sh -n --quiet --skip-summary && \
+    ./install.sh -n && \
     CGO_ENABLED=1 go build -v -trimpath -ldflags="-w -s" -o app ./cmd/app/
 
 
