@@ -10,8 +10,10 @@ RUN apt-get update && \
         zlib1g-dev && \
     rm -rf /var/lib/apt/lists/*
 
-COPY go.mod go.sum ./
-RUN go mod tidy && go mod download
+COPY go.mod ./
+RUN go mod tidy
+COPY install.sh ./
+COPY . .
 
 COPY install.sh ./
 COPY . .
