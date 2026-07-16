@@ -401,7 +401,8 @@ func buildSettingsMarkup(chatID int64, s *database.ChatSettings) *tg.ReplyInline
 	)
 
 	// Thumbnails
-	thumbStatus := utils.IfElse(!s.ThumbnailsDisabled, "enabled", "disabled")
+	noThumb, _ := database.ThumbnailsDisabled(chatID)
+	thumbStatus := utils.IfElse(!noThumb, "enabled", "disabled")
 
 	kb.AddRow(
 		tg.Button.Data(F(chatID, "settings_btn_nothumb"), "info:nothumb"),
