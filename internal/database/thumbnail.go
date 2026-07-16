@@ -17,23 +17,22 @@
 
 package database
 
-// ThumbnailsDisabled returns whether thumbnails are disabled for the chat.
-// Returns false by default (thumbnails enabled).
+// ThumbnailsDisabled returns whether thumbnails are disabled bot-wide.
 func ThumbnailsDisabled(chatID int64) (bool, error) {
-	settings, err := getChatSettings(chatID)
+	state, err := getBotState()
 	if err != nil {
 		return false, err
 	}
-	return settings.ThumbnailsDisabled, nil
+	return state.NoThumb, nil
 }
 
-// SetThumbnailsDisabled sets whether thumbnails should be disabled for the chat.
+// SetThumbnailsDisabled sets whether thumbnails should be disabled bot-wide.
 func SetThumbnailsDisabled(chatID int64, disabled bool) error {
-	return modifyChatSettings(chatID, func(s *ChatSettings) bool {
-		if s.ThumbnailsDisabled == disabled {
+	return modifyBotState(func(s *BotState) bool {
+		if s.NoThumb == disabled {
 			return false
 		}
-		s.ThumbnailsDisabled = disabled
+		s.NoThumb = disabled
 		return true
 	})
 }
