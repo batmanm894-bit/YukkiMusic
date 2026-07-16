@@ -5,22 +5,22 @@ CONFIRM_RESUME_BTN: "▶️ Resume"
 CONFIRM_UNMUTE_BTN: "🔊 Unmute"
 CONFIRM_STOP_BTN: "⏹️ Stop"
 ADD_ME_BTN: "⚡ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ"
-BROADCAST_CANCEL_BTN: "🚫 Cancel Broadcast"
+BROADCAST_CANCEL_BTN: "🚫 𝘾𝙖𝙣𝙘𝙚𝙡 𝘽𝙧𝙤𝙖𝙙𝙘𝙖𝙨𝙩"
 CLOSE_BTN: "Close"
-DOWNLOAD_CANCEL_BTN: "🚦 Cancel Downloading"
-GC_HELP_BTN: "📒 Commands"
+DOWNLOAD_CANCEL_BTN: "🚦 𝘾𝙖𝙣𝙘𝙚𝙡 𝘿𝙤𝙬𝙣𝙡𝙤𝙖𝙙𝙞𝙣𝙜"
+GC_HELP_BTN: "📒 𝘾𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
 
-START_HELP_BTN: "❓ ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅꜱ"
+START_HELP_BTN: "𝙃𝙀𝙇𝙋 & 𝘾𝙊𝙈𝙈𝘼𝙉𝘿𝙎"
 
-UPDATES_BTN: "📢 ᴜᴘᴅᴀᴛᴇꜱ"
-SUPPORT_BTN: "💬 ꜱᴜᴘᴘᴏʀᴛ"
+UPDATES_BTN: "𝙐𝙋𝘿𝘼𝙏𝙀𝙎"
+SUPPORT_BTN: "𝙎𝙐𝙋𝙋𝙊𝙍𝙏"
 
-HELP_ADMINS_BTN: "🛠 Admins"
-HELP_PUBLIC_BTN: "🌍 Public"
-HELP_OWNER_BTN: "👑 Owner"
-HELP_SUDOERS_BTN: "⚡ Sudoers"
+HELP_ADMINS_BTN: "𝘼𝘿𝙈𝙄𝙉𝙎"
+HELP_PUBLIC_BTN: "𝙋𝙐𝘽𝙇𝙄𝘾"
+HELP_OWNER_BTN: "𝙊𝙒𝙉𝙀𝙍"
+HELP_SUDOERS_BTN: "𝙎𝙐𝘿𝙊𝙀𝙍𝙎"
 
-BACK_BTN: "⬅️ Back"
+BACK_BTN: "𝘽𝘼𝘾𝙆"
 
 # basically this string used in /command [bool]
 invalid_bool: "⚠️ <b>Invalid value.</b>\nUse 'enable' or 'disable'."
@@ -891,7 +891,7 @@ spt_result: |
 start_private: |
   ┌ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ─────────────────────────•
   │ ʜᴇʏ, {user} !!
-  │ ɪ ᴀᴍ ⌜ {bot} ⌟
+  │ ɪ ᴀᴍ ⌜ {bot} 99 ⌟
   └──────────────────────────────────────•
 
   "{bot}"
