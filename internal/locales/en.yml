@@ -889,16 +889,15 @@ spt_result: |
   Upload: <code>{ul_mbps} Mbps</code>
 
 start_private: |
-  ┌ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ─────────────────────────•
-  │ ʜᴇʏ, {user} !!
-  │ ɪ ᴀᴍ ⌜ {bot} ⌟
-  └──────────────────────────────────────•
-
-   <blockquote>{bot}❞</blockquote>
-  <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ❞</blockquote>
-
-  <blockquote>ᴘᴏᴡᴇʀᴇᴅ » {owner}</blockquote>
-
+ ┌ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ─────────────────────────•
+ │ ʜᴇʏ, {user} !!
+ │ ɪ ᴀᴍ ⌜ {bot} ⌟
+ └──────────────────────────────────────•
+ <blockquote>{bot}  ❞
+ ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ ❞
+ ───────────────────────────────────────
+ ᴘᴏᴡᴇʀᴇᴅ » { Oᴡɴᴇʀ }
+ ───────────────────────────────────────<blockquote>
 start_group: "<b>💫 I’m here!</b> Try a command… if you think you can handle me 😉"
 
 stream_channelid_fail: "⚠️ Failed to get your connected channel’s ID."
@@ -907,13 +906,13 @@ stream_downloading_next: "📥 Downloading your next track..."
 stream_download_fail: "❌ Failed to download.\nError: <code>{error}</code>"
 stream_play_fail: "❌ Failed to play the song."
 stream_now_playing: |
-  `ɴᴏᴡ ᴘʟᴀʏɪɴɢ 
+  𝔑𝔬𝔴 𝔓𝔩𝔞𝔶𝔦𝔫𝔤 ❞
 
-  <blockquote>á´›Éªá´›ÊŸá´‡: <a href="{url}">{title}</a>
-  á´…á´œÊ€á´€á´›Éªá´É´: {duration}
-  Ê€á´‡Ç«á´œá´‡êœ±á´›á´‡á´…: {by}</blockquote>
+  <blockquote>ᴛɪᴛʟᴇ: <a href="{url}">{title}</a> ❞
+  ᴅᴜʀᴀᴛɪᴏɴ: {duration}
+  ʀᴇQᴜᴇꜱᴛᴇᴅ: {by}</blockquote>
 
-  <blockquote>á´˜á´á´¡á´‡Ê€á´‡á´…: {owner}</blockquote>
+  <blockquote>ᴘᴏᴡᴇʀᴇᴅ: {owner} ❞</blockquote>
 
 # 👑 Sudo / Owner Join Messages
 sudo_join_owner: "👑 {user} — Hey Boss, owner of {bot} — just entered the chat."
