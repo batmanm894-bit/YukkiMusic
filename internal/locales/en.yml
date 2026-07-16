@@ -4,23 +4,23 @@ name: "🇺🇸 English"
 CONFIRM_RESUME_BTN: "▶️ Resume"
 CONFIRM_UNMUTE_BTN: "🔊 Unmute"
 CONFIRM_STOP_BTN: "⏹️ Stop"
-ADD_ME_BTN: "⚡ ᴀᴅᴅ ᴍᴇ ᴛᴏ ʏᴏᴜʀ ɢʀᴏᴜᴘ"
+ADD_ME_BTN: "ᴛᴀᴘ ᴛᴏ sᴇᴇ ᴍᴀɢɪᴄ"
 BROADCAST_CANCEL_BTN: "🚫 𝘾𝙖𝙣𝙘𝙚𝙡 𝘽𝙧𝙤𝙖𝙙𝙘𝙖𝙨𝙩"
 CLOSE_BTN: "Close"
 DOWNLOAD_CANCEL_BTN: "🚦 𝘾𝙖𝙣𝙘𝙚𝙡 𝘿𝙤𝙬𝙣𝙡𝙤𝙖𝙙𝙞𝙣𝙜"
 GC_HELP_BTN: "📒 𝘾𝙤𝙢𝙢𝙖𝙣𝙙𝙨"
 
-START_HELP_BTN: "𝙃𝙀𝙇𝙋 & 𝘾𝙊𝙈𝙈𝘼𝙉𝘿𝙎"
+START_HELP_BTN: "ʜᴇʟᴘ & ᴄᴏᴍᴍᴀɴᴅs"
 
-UPDATES_BTN: "𝙐𝙋𝘿𝘼𝙏𝙀𝙎"
-SUPPORT_BTN: "𝙎𝙐𝙋𝙋𝙊𝙍𝙏"
+UPDATES_BTN: "ᴜᴘᴅᴀᴛᴇs"
+SUPPORT_BTN: "sᴜᴘᴘᴏʀᴛ"
 
-HELP_ADMINS_BTN: "𝘼𝘿𝙈𝙄𝙉𝙎"
-HELP_PUBLIC_BTN: "𝙋𝙐𝘽𝙇𝙄𝘾"
-HELP_OWNER_BTN: "𝙊𝙒𝙉𝙀𝙍"
-HELP_SUDOERS_BTN: "𝙎𝙐𝘿𝙊𝙀𝙍𝙎"
+HELP_ADMINS_BTN: "ᴀᴅᴍɪɴs"
+HELP_PUBLIC_BTN: "ᴘᴜʙʟɪᴄ"
+HELP_OWNER_BTN: "ᴏᴡɴᴇʀ"
+HELP_SUDOERS_BTN: "sᴜᴅᴏᴇʀs"
 
-BACK_BTN: "𝘽𝘼𝘾𝙆"
+BACK_BTN: "ʙᴀᴄᴋ"
 
 # basically this string used in /command [bool]
 invalid_bool: "⚠️ <b>Invalid value.</b>\nUse 'enable' or 'disable'."
@@ -893,11 +893,11 @@ start_private: |
  │ ʜᴇʏ, {user} !!
  │ ɪ ᴀᴍ ⌜ {bot} ⌟
  └──────────────────────────────────────•
- <blockquote>{bot}  ❞
- ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ ❞
+ <blockquote>{bot} ❞<blockquote>
+ <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ ❞<blockquote>
  ───────────────────────────────────────
- ᴘᴏᴡᴇʀᴇᴅ » { Oᴡɴᴇʀ }
- ───────────────────────────────────────<blockquote>
+ ᴘᴏᴡᴇʀᴇᴅ » {Oᴡɴᴇʀ}
+ ───────────────────────────────────────
 start_group: "<b>💫 I’m here!</b> Try a command… if you think you can handle me 😉"
 
 stream_channelid_fail: "⚠️ Failed to get your connected channel’s ID."
