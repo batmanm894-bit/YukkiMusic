@@ -99,7 +99,7 @@ var handlers = []MsgHandlerDef{
 	{
 		Pattern: "(sudoers|listsudo|sudolist)",
 		Handler: handleGetSudoers,
-		Filters: []telegram.Filter{ignoreChannelFilter},
+		Filters: []telegram.Filter{sudoOnlyFilter, ignoreChannelFilter},
 	},
 
 	{
