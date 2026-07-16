@@ -32,6 +32,19 @@ func init() {
 	helpTexts["/start"] = `<i>Start the bot and show main menu.</i>`
 }
 
+// ownerMention returns an HTML mention for the configured bot owner,
+// falling back to a plain "Owner" label if it can't be resolved.
+func ownerMention(client *tg.Client) string {
+	if config.OwnerID == 0 {
+		return "Owner"
+	}
+	owner, err := client.GetUser(config.OwnerID)
+	if err != nil {
+		return "Owner"
+	}
+	return utils.MentionHTML(owner)
+}
+
 func startHandler(m *tg.NewMessage) error {
 	if m.ChatType() != tg.EntityUser {
 		database.AddServedChat(m.ChannelID())
@@ -59,8 +72,9 @@ func startHandler(m *tg.NewMessage) error {
 
 	default:
 		caption := F(m.ChannelID(), "start_private", locales.Arg{
-			"user": utils.MentionHTML(m.Sender),
-			"bot":  utils.MentionHTML(m.Client.Me()),
+			"user":  utils.MentionHTML(m.Sender),
+			"bot":   utils.MentionHTML(m.Client.Me()),
+			"owner": ownerMention(m.Client),
 		})
 
 		if err := sendStartResponse(m, caption); err != nil {
@@ -127,8 +141,9 @@ func startCB(cb *tg.CallbackQuery) error {
 	cb.Answer("")
 
 	caption := F(cb.ChannelID(), "start_private", locales.Arg{
-		"user": utils.MentionHTML(cb.Sender),
-		"bot":  utils.MentionHTML(cb.Client.Me()),
+		"user":  utils.MentionHTML(cb.Sender),
+		"bot":   utils.MentionHTML(cb.Client.Me()),
+		"owner": ownerMention(cb.Client),
 	})
 
 	sendOpt := &tg.SendOptions{
