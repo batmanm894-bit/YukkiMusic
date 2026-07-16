@@ -42,7 +42,8 @@ type BotState struct {
 	AutoLeave     bool        `bson:"autoleave"`
 	LoggerEnabled bool        `bson:"logger"`
 	Maintenance   Maintenance `bson:"maint,omitempty"`
-
+    
+	NoThumb       bool        `bson:"no_thumb"`
 	// runtime indexes for fast lookup
 	servedUsersMap map[int64]struct{} `bson:"-"`
 	servedChatsMap map[int64]struct{} `bson:"-"`
