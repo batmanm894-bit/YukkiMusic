@@ -332,7 +332,10 @@ func settingsCallbackHandler(cb *tg.CallbackQuery) error {
 		}
 		settings.CleanModeDurationMins = next
 	case "nothumb":
-		settings.ThumbnailsDisabled = !settings.ThumbnailsDisabled
+	current, _ := database.ThumbnailsDisabled(chatID)
+		if err := database.SetThumbnailsDisabled(chatID, !current); err != nil {
+			return err
+		}
 	}
 
 	if err := database.UpdateChatSettings(settings); err != nil {
