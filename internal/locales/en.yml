@@ -488,7 +488,7 @@ play_download_failed: |
   Error: <code>{error}</code>
 
 play_added_to_queue_single: |
-   <blockquote><b>🎵 Added to Queue:</b> #{index}</blockquote>
+  <blockquote><b>🎵 Added to Queue:</b> #{index}</blockquote>
 
   <blockquote><b>▫ Track:</b> <a href="{url}">{title}</a></blockquote>
   <blockquote><b>▫ Duration:</b> {duration}</blockquote>
