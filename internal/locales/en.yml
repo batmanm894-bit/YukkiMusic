@@ -488,11 +488,11 @@ play_download_failed: |
   Error: <code>{error}</code>
 
 play_added_to_queue_single: |
-   <blockquote><b>🎵 Added to Queue:</b> #{index}<blockquote>
+   <blockquote><b>🎵 Added to Queue:</b> #{index}</blockquote>
 
-  <blockquote><b>▫ Track:</b> <a href="{url}">{title}</a><blockquote>
-  <blockquote><b>▫ Duration:</b> {duration}<blockquote>
-  <blockquote><b>▫ Requested by:</b> {by}<blockquote>
+  <blockquote><b>▫ Track:</b> <a href="{url}">{title}</a></blockquote>
+  <blockquote><b>▫ Duration:</b> {duration}</blockquote>
+  <blockquote><b>▫ Requested by:</b> {by}</blockquote>
 
 play_multiple_tracks_too_long_header: "<b>⚠️ {count} tracks were skipped (max duration {limit_mins} mins):</b>"
 play_multiple_tracks_too_long_item: "— <i>{title}</i>"
@@ -894,10 +894,10 @@ start_private: |
   │ ɪ ᴀᴍ ⌜ {bot} ⌟
   └──────────────────────────────────────•
 
-   <blockquote>{bot}❞<blockquote>
+   <blockquote>{bot}❞</blockquote>
   <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ❞</blockquote>
 
-  <blockquote>ᴘᴏᴡᴇʀᴇᴅ » {owner}<blockquote>
+  <blockquote>ᴘᴏᴡᴇʀᴇᴅ » {owner}</blockquote>
 
 start_group: "<b>💫 I’m here!</b> Try a command… if you think you can handle me 😉"
 
@@ -906,7 +906,6 @@ stream_queue_finished: "🎵 <b>Queue Finished!</b>\n\nNo more songs to play. Us
 stream_downloading_next: "📥 Downloading your next track..."
 stream_download_fail: "❌ Failed to download.\nError: <code>{error}</code>"
 stream_play_fail: "❌ Failed to play the song."
-stream_now_playing: |
 stream_now_playing: |
   `ɴᴏᴡ ᴘʟᴀʏɪɴɢ 
 
