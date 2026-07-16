@@ -18,6 +18,8 @@
 package modules
 
 import (
+	"fmt"
+	
 	"github.com/Laky-64/gologging"
 	tg "github.com/amarnathcjd/gogram/telegram"
 
@@ -42,7 +44,7 @@ func ownerMention(client *tg.Client) string {
 	if err != nil {
 		return "Owner"
 	}
-	return utils.MentionHTML(owner)
+	return fmt.Sprintf(`<a href="tg://user?id=%d">Owner</a>`, owner.ID)
 }
 
 func startHandler(m *tg.NewMessage) error {
