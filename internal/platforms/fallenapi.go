@@ -25,6 +25,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/Laky-64/gologging"
 	"github.com/amarnathcjd/gogram/telegram"
@@ -104,20 +105,38 @@ func (f *FallenApiPlatform) Download(
 
 	path := getPath(track, ".mp3")
 
-	var downloadErr error
+	// Telegram-hosted files must be downloaded via the Telegram client;
+	// there's no direct HTTP stream URL for them.
 	if telegramDLRegex.MatchString(dlURL) {
-		path, downloadErr = f.downloadFromTelegram(ctx, dlURL, path, pm)
-	} else {
-		downloadErr = f.downloadFromURL(ctx, dlURL, path)
+		downloadedPath, downloadErr := f.downloadFromTelegram(ctx, dlURL, path, pm)
+		if downloadErr != nil {
+			return "", downloadErr
+		}
+		if !fileExists(downloadedPath) {
+			return "", errors.New("empty file returned by API")
+		}
+		return downloadedPath, nil
 	}
 
-	if downloadErr != nil {
-		return "", downloadErr
+	// Direct CDN URL: stream it immediately for instant playback, and cache
+	// it to disk in the background so replays are instant too.
+	go f.cacheInBackground(dlURL, path)
+
+	return dlURL, nil
+}
+
+// cacheInBackground downloads a track to disk after playback has already
+// started streaming from the CDN URL, so subsequent plays hit the local
+// cache instead of re-fetching from the API.
+func (f *FallenApiPlatform) cacheInBackground(dlURL, path string) {
+	bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	if err := f.downloadFromURL(bgCtx, dlURL, path); err != nil {
+		gologging.Debug("FallenApi: background cache failed -> " + err.Error())
+		return
 	}
-	if !fileExists(path) {
-		return "", errors.New("empty file returned by API")
-	}
-	return path, nil
+	gologging.Debug("FallenApi: background cache complete -> " + path)
 }
 
 func (f *FallenApiPlatform) getDownloadURL(
@@ -236,3 +255,4 @@ func (f *FallenApiPlatform) downloadFromTelegram(
 	}
 	return path, nil
 }
+
