@@ -125,10 +125,18 @@ func (f *FallenApiPlatform) Download(
 	return dlURL, nil
 }
 
+// backgroundCacheDelay lets live playback have the CDN/bandwidth to itself
+// for a while before the background cache download starts, instead of both
+// competing for bandwidth at the same time right as playback begins.
+const backgroundCacheDelay = 20 * time.Second
+
 // cacheInBackground downloads a track to disk after playback has already
 // started streaming from the CDN URL, so subsequent plays hit the local
-// cache instead of re-fetching from the API.
+// cache instead of re-fetching from the API. It waits backgroundCacheDelay
+// first so it doesn't compete with the live stream for bandwidth.
 func (f *FallenApiPlatform) cacheInBackground(dlURL, path string) {
+	time.Sleep(backgroundCacheDelay)
+
 	bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
