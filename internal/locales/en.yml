@@ -488,11 +488,11 @@ play_download_failed: |
   Error: <code>{error}</code>
 
 play_added_to_queue_single: |
-  <b>🎵 Added to Queue:</b> #{index}
+   <blockquote><b>🎵 Added to Queue:</b> #{index}<blockquote>
 
-  <b>▫ Track:</b> <a href="{url}">{title}</a>
-  <b>▫ Duration:</b> {duration}
-  <b>▫ Requested by:</b> {by}
+  <blockquote><b>▫ Track:</b> <a href="{url}">{title}</a><blockquote>
+  <blockquote><b>▫ Duration:</b> {duration}<blockquote>
+  <blockquote><b>▫ Requested by:</b> {by}<blockquote>
 
 play_multiple_tracks_too_long_header: "<b>⚠️ {count} tracks were skipped (max duration {limit_mins} mins):</b>"
 play_multiple_tracks_too_long_item: "— <i>{title}</i>"
@@ -891,13 +891,13 @@ spt_result: |
 start_private: |
   ┌ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ─────────────────────────•
   │ ʜᴇʏ, {user} !!
-  │ ɪ ᴀᴍ ⌜ {bot} 99 ⌟
+  │ ɪ ᴀᴍ ⌜ {bot} ⌟
   └──────────────────────────────────────•
 
-  "{bot}"
-  <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ</blockquote>
+   <blockquote>{bot}❞<blockquote>
+  <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ❞</blockquote>
 
-  "ᴘᴏᴡᴇʀᴇᴅ » {owner}"
+  <blockquote>ᴘᴏᴡᴇʀᴇᴅ » {owner}<blockquote>
 
 start_group: "<b>💫 I’m here!</b> Try a command… if you think you can handle me 😉"
 
@@ -907,15 +907,18 @@ stream_downloading_next: "📥 Downloading your next track..."
 stream_download_fail: "❌ Failed to download.\nError: <code>{error}</code>"
 stream_play_fail: "❌ Failed to play the song."
 stream_now_playing: |
-  <b>🎵 Now Playing:</b>
+stream_now_playing: |
+  `ɴᴏᴡ ᴘʟᴀʏɪɴɢ 
 
-  <b>▫ Track:</b> <a href="{url}">{title}</a>
-  <b>▫ Duration:</b> {duration}
-  <b>▫ Requested by:</b> {by}
+  <blockquote>á´›Éªá´›ÊŸá´‡: <a href="{url}">{title}</a>
+  á´…á´œÊ€á´€á´›Éªá´É´: {duration}
+  Ê€á´‡Ç«á´œá´‡êœ±á´›á´‡á´…: {by}</blockquote>
+
+  <blockquote>á´˜á´á´¡á´‡Ê€á´‡á´…: {owner}</blockquote>
 
 # 👑 Sudo / Owner Join Messages
 sudo_join_owner: "👑 {user} — Hey Boss, owner of {bot} — just entered the chat."
-sudo_join_sudo: "🛡️ Hey Boss {user}, a sudo user of {bot}, just joined the chat."
+sudo_join_sudo: "🛡️ Hey Boss {user}, owner of  {bot}, just joined the chat."
 
 supergroup_needed: |
   This chat (ID: <code>{chat_id}</code>) is not a SuperGroup yet.
