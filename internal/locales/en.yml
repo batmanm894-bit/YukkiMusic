@@ -461,7 +461,7 @@ only_admin_or_auth: "⚠️ <b>Access Denied</b>\nOnly <b>admins</b> or <b>autho
 only_admin_or_auth_cb: "⚠️ Only admins or authorized users can do these actions."
 only_supergroup: "⚠️ This command can only be used in groups."
 only_owner: "⚠️ Only the bot owner can use this command."
-only_sudo: "⚠️ Only sudo users or the bot owner can use this command."
+only_sudo: "⚠️ Only owner friends can use this command."
 
 pause_invalid_duration: "⚠️ Invalid duration for auto-resume.\nIt must be between <b>5</b> and <b>3600</b> seconds."
 pause_invalid_format: "⚠️ Invalid format.\nUse: <code>/{cmd} 30</code> or <code>/{cmd} 30s</code>"
@@ -678,8 +678,8 @@ rtmp_streaming_not_supported: |
 rtmp_configured_success: "✅ RTMP configured successfully for Chat ID: <code>{chat_id}</code>"
 
 
-searching: "🔍🎶 Searching... ⚡✨"
-searching_query: "🔍🎶 Searching for: <b>{query}</b>... ⚡✨"
+searching: " Searching... "
+searching_query: "Searching for: <b>{query}</b>... "
 
 
 settings_btn_adminmode: "🛡️ Admin Mode"
@@ -893,11 +893,11 @@ start_private: |
   │ ʜᴇʏ, {user} !!
   │ ɪ ᴀᴍ ⌜ {bot} ⌟
   └──────────────────────────────────────•
-  {bot} ❞
-  ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ ❞
-  ───────────────────────────────────────
-  ᴘᴏᴡᴇʀᴇᴅ » {owner}
-  ───────────────────────────────────────
+
+  <blockquote>{bot}</blockquote>
+  <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ</blockquote>
+
+  <blockquote>ᴘᴏᴡᴇʀᴇᴅ » {owner}</blockquote>
 
 start_group: "<b>💫 I’m here!</b> Try a command… if you think you can handle me 😉"
 
@@ -914,8 +914,8 @@ stream_now_playing: |
   <b>▫ Requested by:</b> {by}
 
 # 👑 Sudo / Owner Join Messages
-sudo_join_owner: "👑 {user} — owner of {bot} — just entered the chat."
-sudo_join_sudo: "🛡️ {user}, a sudo user of {bot}, just joined the chat."
+sudo_join_owner: "👑 {user} — Hey Boss"  "owner  of {bot} — just entered the chat."
+sudo_join_sudo: "Hey Boss {user}, "     "owner of {bot}, just joined the chat."
 
 supergroup_needed: |
   This chat (ID: <code>{chat_id}</code>) is not a SuperGroup yet.
