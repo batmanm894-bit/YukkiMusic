@@ -890,14 +890,14 @@ spt_result: |
 
 start_private: |
  ┌ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ─────────────────────────•
- │ ʜᴇʏ, {user} !!
- │ ɪ ᴀᴍ ⌜ {bot} ⌟
- └──────────────────────────────────────•
- <blockquote>{bot} ❞<blockquote>
- <blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ ❞<blockquote>
- ───────────────────────────────────────
- ᴘᴏᴡᴇʀᴇᴅ » {Oᴡɴᴇʀ}
- ───────────────────────────────────────
+│ ʜᴇʏ, {user}!!
+│ ɪ ᴀᴍ ⌜ {bot} ⌟
+└──────────────────────────────────────•
+<blockquote>{bot} ❞</blockquote>
+<blockquote>ʏᴏᴜʀ ᴘᴇʀꜱᴏɴᴀʟ ᴍᴜꜱɪᴄ ᴄᴏᴍᴘᴀɴɪᴏɴ ❞</blockquote>
+───────────────────────────────────────
+ᴘᴏᴡᴇʀᴇᴅ » <a href="https://t.me@Gonnaagree">Oᴡɴᴇʀ</a>
+───────────────────────────────────────
 start_group: "<b>💫 I’m here!</b> Try a command… if you think you can handle me 😉"
 
 stream_channelid_fail: "⚠️ Failed to get your connected channel’s ID."
@@ -912,7 +912,7 @@ stream_now_playing: |
   ᴅᴜʀᴀᴛɪᴏɴ: {duration}
   ʀᴇQᴜᴇꜱᴛᴇᴅ: {by}</blockquote>
 
-  <blockquote>ᴘᴏᴡᴇʀᴇᴅ: {owner} ❞</blockquote>
+  <blockquote>ᴘᴏᴡᴇʀᴇᴅ: <a href="https://t.me/GonnaAgree">Oᴡɴᴇʀ</a> ❞</blockquote>
 
 # 👑 Sudo / Owner Join Messages
 sudo_join_owner: "👑 {user} — Hey Boss, owner of {bot} — just entered the chat."
