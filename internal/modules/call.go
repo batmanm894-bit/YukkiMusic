@@ -121,6 +121,7 @@ func streamEndHandler(
 
 		return
 	}
+	prefetchNextInQueue(r)
 
 	title := utils.ShortTitle(t.Title, 25)
 	safeTitle := utils.EscapeHTML(title)
@@ -143,4 +144,14 @@ func streamEndHandler(
 
 	statusMsg, _ = utils.EOR(statusMsg, msgText, opt)
 	r.SetStatusMsg(statusMsg)
+}
+
+// prefetchNextInQueue starts warming up the download for the next queued
+// track in the background as soon as the current track begins playing, so
+// it's ready (or already cached) by the time it's needed instead of only
+// starting once the current track ends. No-op if the queue is empty.
+func prefetchNextInQueue(r *core.RoomState) {
+	if q := r.Queue(); len(q) > 0 {
+		platforms.Prefetch(q[0])
+	}
 }
