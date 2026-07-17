@@ -50,7 +50,16 @@ func init() {
 	if err := copyEmbeddedCookies(); err != nil {
 		gologging.Fatal("Failed to copy embedded cookies:", err)
 	}
+}
 
+// Init downloads any cookie files configured via COOKIES_LINK.
+//
+// NOTE: this must be called explicitly *after* config.Load() has run
+// (e.g. from platforms.Init()). It can't be done from this package's own
+// init() because Go runs all package init() functions before main() calls
+// config.Load() — at that point config.CookiesLink is always still empty,
+// so COOKIES_LINK would silently never be fetched.
+func Init() {
 	urls := strings.Fields(config.CookiesLink)
 	for _, url := range urls {
 		if err := downloadCookieFile(url); err != nil {
@@ -152,4 +161,57 @@ func GetRandomCookieFile() (string, error) {
 	}
 
 	return cachedFiles[rand.Intn(len(cachedFiles))], nil
+}
+
+// GetRandomCookieHeader picks a random cookie file (same pool used for
+// yt-dlp's --cookies) and turns its youtube.com/google.com entries into a
+// ready-to-use "name=value; name2=value2" Cookie header string, for direct
+// HTTP calls (e.g. the innertube API) that don't go through yt-dlp.
+// Returns "" (no error) when no cookie files are configured.
+func GetRandomCookieHeader() (string, error) {
+	file, err := GetRandomCookieFile()
+	if err != nil || file == "" {
+		return "", err
+	}
+
+	return parseNetscapeCookieHeader(file)
+}
+
+// parseNetscapeCookieHeader reads a Netscape-format cookie file and returns
+// its youtube.com/google.com cookies as a single "name=value; ..." header.
+func parseNetscapeCookieHeader(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	var pairs []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Netscape format: domain  flag  path  secure  expiry  name  value
+		fields := strings.Split(line, "\t")
+		if len(fields) < 7 {
+			continue
+		}
+
+		domain := fields[0]
+		if !strings.Contains(domain, "youtube.com") &&
+			!strings.Contains(domain, "google.com") {
+			continue
+		}
+
+		name := fields[5]
+		value := fields[6]
+		if name == "" {
+			continue
+		}
+
+		pairs = append(pairs, name+"="+value)
+	}
+
+	return strings.Join(pairs, "; "), nil
 }
