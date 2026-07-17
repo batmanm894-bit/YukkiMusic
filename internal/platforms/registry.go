@@ -34,6 +34,8 @@ import (
 	"resty.dev/v3"
 
 	state "main/internal/core/models"
+	"main/internal/config"
+	"main/internal/cookies"
 	"main/internal/database"
 	"main/internal/utils"
 )
@@ -346,6 +348,15 @@ func combineErrors(prefix string, errs []string) error {
 }
 
 func Init() (func(), error) {
+	// These need config to be loaded first (config.Load() runs in main(),
+	// before this), so they can't be done at package-init time.
+	cookies.Init()
+
+	if config.ProxyURL != "" {
+		rc.SetProxy(config.ProxyURL)
+		gologging.Info("Outbound requests (YouTube, etc.) routed through configured proxy")
+	}
+
 	return func() {
 		rc.Close()
 	}, nil
