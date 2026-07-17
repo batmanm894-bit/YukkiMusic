@@ -27,11 +27,13 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Laky-64/gologging"
 	"github.com/amarnathcjd/gogram/telegram"
 
+	"main/internal/config"
 	"main/internal/cookies"
 	state "main/internal/core/models"
 )
@@ -230,6 +232,53 @@ func (y *YtdlpPlatform) CanDownload(source state.PlatformName) bool {
 	return source == y.name || source == PlatformYouTube
 }
 
+// --- yt-dlp concurrency limiter ---
+//
+// yt-dlp spawns a real OS process every time it's invoked (metadata
+// search, stream-URL resolve, or a background download). That's the
+// heaviest per-request cost this bot has. On a small/free host running
+// many active chats at once, letting an unbounded number of these run
+// simultaneously can exhaust RAM/CPU and crash the whole bot. This
+// semaphore caps how many yt-dlp processes may run at the same time,
+// across every chat combined (tune via MAX_CONCURRENT_YTDLP).
+var (
+	ytdlpSem     chan struct{}
+	ytdlpSemOnce sync.Once
+)
+
+func ytdlpSemaphore() chan struct{} {
+	ytdlpSemOnce.Do(func() {
+		n := config.MaxConcurrentYtdlp
+		if n < 1 {
+			n = 1
+		}
+		ytdlpSem = make(chan struct{}, n)
+	})
+	return ytdlpSem
+}
+
+// acquireYtdlpSlot blocks until a yt-dlp process slot is free, or ctx is
+// canceled. Used for requests a real user is actively waiting on - they
+// wait their fair turn instead of being rejected outright.
+func acquireYtdlpSlot(ctx context.Context) (release func(), err error) {
+	sem := ytdlpSemaphore()
+	select {
+	case sem <- struct{}{}:
+		return func() { <-sem }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// ytdlpBusy reports whether the yt-dlp process pool is currently at
+// capacity. Used by best-effort background work (prefetching) to skip
+// itself entirely rather than queue up and risk delaying real play
+// requests that need a slot.
+func ytdlpBusy() bool {
+	sem := ytdlpSemaphore()
+	return len(sem) >= cap(sem)
+}
+
 func (y *YtdlpPlatform) Download(
 	ctx context.Context,
 	track *state.Track,
@@ -237,6 +286,130 @@ func (y *YtdlpPlatform) Download(
 ) (string, error) {
 	if f := findFile(track); f != "" {
 		gologging.Debug("Ytdlp: Download -> Cached File -> " + f)
+		return f, nil
+	}
+
+	safeURL, err := sanitizeMediaURL(track.URL)
+	if err != nil {
+		return "", errUnsafeURL
+	}
+
+	// Video has to be downloaded (audio+video muxed together) before it can
+	// play at all, so there's no "instant" path for it.
+	if track.Video {
+		return y.downloadToDisk(ctx, track, safeURL)
+	}
+
+	// Audio: resolve a direct, instantly-playable stream URL first (fast -
+	// no download happens), and cache the real file to disk in the
+	// background afterwards. This mirrors FallenApi's instant-play /
+	// background-cache pattern so both platforms behave the same way to
+	// the caller, and so racing the two of them is meaningful (whichever
+	// resolves a URL first wins, instead of whichever downloads first).
+	gologging.InfoF("YtDlp: Resolving stream URL for %s", track.Title)
+	streamURL, err := y.getStreamURL(ctx, safeURL)
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		gologging.Debug(
+			"YtDlp: instant stream URL failed, falling back to direct download: " + err.Error(),
+		)
+		return y.downloadToDisk(ctx, track, safeURL)
+	}
+
+	// Cache the real file to disk in the background, using its own
+	// independent context so it survives even if ctx (the caller's/race
+	// context) is later canceled.
+	go y.cacheInBackground(track, safeURL)
+
+	return streamURL, nil
+}
+
+// getStreamURL asks yt-dlp for a direct, playable media URL without
+// downloading anything (-g). This is what makes yt-dlp fast enough to
+// meaningfully race against FallenApi.
+func (y *YtdlpPlatform) getStreamURL(
+	ctx context.Context,
+	safeURL string,
+) (string, error) {
+	args := []string{
+		"--no-playlist",
+		"--no-warnings",
+		"--no-check-certificate",
+		"-f", "ba[abr>=180][abr<=360]/ba",
+		"-g",
+	}
+
+	if y.isYouTubeURL(safeURL) {
+		if cookieFile, err := cookies.GetRandomCookieFile(); err == nil &&
+			cookieFile != "" {
+			args = append(args, "--cookies", cookieFile)
+		}
+	}
+
+	args = append(args, "--", safeURL)
+
+	release, err := acquireYtdlpSlot(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+
+	gctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(gctx, "yt-dlp", args...)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+		return "", fmt.Errorf(
+			"yt-dlp -g failed: %w (%s)", err, strings.TrimSpace(stderr.String()),
+		)
+	}
+
+	fields := strings.Fields(strings.TrimSpace(stdout.String()))
+	if len(fields) == 0 {
+		return "", errors.New("yt-dlp returned no stream URL")
+	}
+
+	// The format selector above always resolves to a single audio stream,
+	// so there's exactly one URL to use.
+	return fields[0], nil
+}
+
+// cacheInBackground downloads the track to disk after playback has already
+// started streaming from the resolved URL (waiting backgroundCacheDelay,
+// shared with FallenApi and defined in fallenapi.go, first), so subsequent
+// plays hit the local cache instead of re-resolving/re-streaming.
+func (y *YtdlpPlatform) cacheInBackground(track *state.Track, safeURL string) {
+	time.Sleep(backgroundCacheDelay)
+
+	bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	if _, err := y.downloadToDisk(bgCtx, track, safeURL); err != nil {
+		gologging.Debug("YtDlp: background cache failed -> " + err.Error())
+		return
+	}
+	gologging.Debug("YtDlp: background cache complete for track " + track.ID)
+}
+
+// downloadToDisk runs the full yt-dlp download (and, for audio, extraction)
+// to disk. Used directly for video, and used for audio both as the
+// background-cache step and as a fallback if instant URL resolution fails.
+func (y *YtdlpPlatform) downloadToDisk(
+	ctx context.Context,
+	track *state.Track,
+	safeURL string,
+) (string, error) {
+	if f := findFile(track); f != "" {
 		return f, nil
 	}
 
@@ -276,12 +449,13 @@ func (y *YtdlpPlatform) Download(
 		}
 	}
 
-	safeURL, err := sanitizeMediaURL(track.URL)
-	if err != nil {
-		return "", errUnsafeURL
-	}
-
 	args = append(args, "--", safeURL)
+
+	release, err := acquireYtdlpSlot(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer release()
 
 	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 
@@ -299,9 +473,8 @@ func (y *YtdlpPlatform) Download(
 		)
 		findAndRemove(track)
 
-		if errors.Is(err, context.Canceled) ||
-			errors.Is(err, context.DeadlineExceeded) {
-			return "", err
+		if ctx.Err() != nil {
+			return "", ctx.Err()
 		}
 
 		return "", fmt.Errorf("yt-dlp error: %w", err)
@@ -342,6 +515,12 @@ func (y *YtdlpPlatform) extractMetadata(urlStr string) (*ytdlpInfo, error) {
 	}
 
 	args = append(args, "--", safeURL)
+
+	release, err := acquireYtdlpSlot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 
