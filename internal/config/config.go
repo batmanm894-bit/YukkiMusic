@@ -53,6 +53,7 @@ var (
 	SupportChat         string
 	SupportChannel      string
 	CookiesLink         string
+	ProxyURL            string
 	SetCmds             bool
 	MaxAuthUsers        int
 	StartImages         []string
@@ -130,6 +131,7 @@ func loadConfig() {
 	SupportChat = getString("SUPPORT_CHAT", "https://t.me/+J73lWqHdZnMwZjE1")
 	SupportChannel = getString("SUPPORT_CHANNEL", "https://t.me/+dn3jwpyv29AwMDM1")
 	CookiesLink = getString("COOKIES_LINK", "")
+	ProxyURL = getString("PROXY_URL", "")
 	SetCmds = getBool("SET_CMDS", false)
 	MaxAuthUsers = int(getInt64("MAX_AUTH_USERS", 25))
 	StartImages = getStringSlice("START_IMAGES", nil)
