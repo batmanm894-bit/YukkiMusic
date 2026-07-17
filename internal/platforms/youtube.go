@@ -29,6 +29,7 @@ import (
 	"github.com/amarnathcjd/gogram/telegram"
 
 	"main/internal/config"
+	"main/internal/cookies"
 	state "main/internal/core/models"
 	"main/internal/utils"
 )
@@ -475,12 +476,17 @@ func (p *YouTubePlatform) callInnerTube(endpoint string, body, result any) error
 		endpoint,
 		innerTubeKey,
 	)
-	resp, err := rc.R().
+	req := rc.R().
 		SetBody(body).
 		SetResult(result).
 		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36").
-		Post(apiURL)
+		SetHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
+
+	if cookieHeader, err := cookies.GetRandomCookieHeader(); err == nil && cookieHeader != "" {
+		req.SetHeader("Cookie", cookieHeader)
+	}
+
+	resp, err := req.Post(apiURL)
 	if err != nil {
 		return fmt.Errorf("innertube request failed: %w", err)
 	}
