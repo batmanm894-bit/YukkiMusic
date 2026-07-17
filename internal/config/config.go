@@ -56,6 +56,7 @@ var (
 	ProxyURL            string
 	SetCmds             bool
 	MaxAuthUsers        int
+	MaxConcurrentYtdlp  int
 	StartImages         []string
 	EffectIDs           []int64
 	PingImage           string
@@ -134,6 +135,7 @@ func loadConfig() {
 	ProxyURL = getString("PROXY_URL", "")
 	SetCmds = getBool("SET_CMDS", false)
 	MaxAuthUsers = int(getInt64("MAX_AUTH_USERS", 25))
+	MaxConcurrentYtdlp = int(getInt64("MAX_CONCURRENT_YTDLP", 4))
 	StartImages = getStringSlice("START_IMAGES", nil)
 	EffectIDs = getInt64Slice("EFFECT_IDS", nil)
 	if len(StartImages) == 0 {
