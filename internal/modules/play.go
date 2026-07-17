@@ -473,6 +473,11 @@ func playTracksAndRespond(
 			return err
 		}
 
+		if filePath != "" {
+			// track actually started playing just now (not merely queued)
+			prefetchNextInQueue(r)
+		}
+
 		sendPlayLogs(m, track, (isActive && !force) || i > 0)
 	}
 
