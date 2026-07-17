@@ -1,3 +1,4 @@
+
 /*
  * ● YukkiMusic
  * ○ A high-performance engine for streaming music in Telegram voicechats.
@@ -181,6 +182,7 @@ func handleSkip(m *telegram.NewMessage, cplay bool) error {
 		core.DeleteRoom(r.ID)
 		return telegram.ErrEndGroup
 	}
+	prefetchNextInQueue(r)
 
 	title := utils.ShortTitle(t.Title, 25)
 	safeTitle := utils.EscapeHTML(title)
