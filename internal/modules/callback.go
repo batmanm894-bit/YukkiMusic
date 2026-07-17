@@ -296,6 +296,7 @@ func handleSkipAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 		core.DeleteRoom(r.ID)
 		return tg.ErrEndGroup
 	}
+	prefetchNextInQueue(r)
 
 	cb.Answer(F(chatID, "cb_skip_success"), opt)
 	cb.Delete()
