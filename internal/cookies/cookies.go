@@ -73,6 +73,10 @@ func Init() {
 }
 
 func copyEmbeddedCookies() error {
+	if err := os.MkdirAll(cookieDir, 0o755); err != nil {
+		return err
+	}
+
 	entries, err := embeddedCookies.ReadDir(".")
 	if err != nil {
 		return err
@@ -107,6 +111,10 @@ func downloadCookieFile(url string) error {
 	id := filepath.Base(url)
 	rawURL := "https://batbin.me/raw/" + id
 	filePath := filepath.Join(cookieDir, id+".txt")
+
+	if err := os.MkdirAll(cookieDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create cookies dir: %w", err)
+	}
 
 	resp, err := client.R().Get(rawURL)
 	if err != nil {
