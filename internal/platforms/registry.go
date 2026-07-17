@@ -218,7 +218,12 @@ func processReplyChain(m *telegram.NewMessage) ([]*state.Track, error) {
 	return []*state.Track{track}, nil
 }
 
-// Download attempts to download a track using available downloaders
+// Download attempts to download a track using available downloaders.
+//
+// For audio, when more than one platform can handle the source, it races
+// them concurrently (see raceDownload) so playback starts via whichever
+// platform responds first. For video, or when only one platform is
+// eligible, it tries platforms one at a time in priority order.
 func Download(
 	ctx context.Context,
 	track *state.Track,
@@ -229,21 +234,43 @@ func Download(
 			track.Source,
 		),
 	)
-	var errs []string
 
-	platforms := GetOrderedPlatforms()
-	for _, p := range platforms {
-		if !p.CanDownload(track.Source) {
-			gologging.Debug(
-				"Platform [" + string(
-					p.Name(),
-				) + "] cannot download source: " + string(
-					track.Source,
-				),
-			)
+	var candidates []state.Platform
+	for _, p := range GetOrderedPlatforms() {
+		if p.CanDownload(track.Source) {
+			candidates = append(candidates, p)
 			continue
 		}
+		gologging.Debug(
+			"Platform [" + string(p.Name()) + "] cannot download source: " + string(track.Source),
+		)
+	}
 
+	if len(candidates) == 0 {
+		return "", errors.New("no downloader available for source: " + string(track.Source))
+	}
+
+	// Video needs a full local (muxed) file before it can play at all, so
+	// there's no "instant" benefit to racing - try platforms one by one
+	// like before, so only one ever writes to disk at a time.
+	if track.Video || len(candidates) == 1 {
+		return sequentialDownload(ctx, candidates, track, statusMsg)
+	}
+
+	return raceDownload(ctx, candidates, track, statusMsg)
+}
+
+// sequentialDownload tries candidates one at a time, in priority order,
+// stopping at the first success.
+func sequentialDownload(
+	ctx context.Context,
+	candidates []state.Platform,
+	track *state.Track,
+	statusMsg *telegram.NewMessage,
+) (string, error) {
+	var errs []string
+
+	for _, p := range candidates {
 		gologging.Debug("Attempting download with platform: " + string(p.Name()))
 		path, err := p.Download(ctx, track, statusMsg)
 		if err == nil {
@@ -261,11 +288,145 @@ func Download(
 		errs = append(errs, errMsg)
 	}
 
+	return "", combineErrors("Multiple download errors occurred", errs)
+}
+
+type raceResult struct {
+	platform state.Platform
+	path     string
+	err      error
+}
+
+// raceDownload runs every candidate platform's Download concurrently under
+// a shared cancellable context. Whichever platform returns success first
+// wins: its result is returned immediately and every other candidate is
+// canceled right away via raceCtx, so it stops as soon as it next checks
+// its context (typically before it does anything that touches disk).
+//
+// Each candidate is given its own shallow copy of the track, since
+// platforms like FallenApi mutate track fields (e.g. forcing Video=false);
+// without a copy per goroutine, concurrent platforms would race on the same
+// struct. The track ID itself is left untouched, so whichever platform
+// wins still caches (in the background) to the normal, canonical filename
+// - no rename/relink step needed, and future replays cache-hit normally.
+func raceDownload(
+	ctx context.Context,
+	candidates []state.Platform,
+	track *state.Track,
+	statusMsg *telegram.NewMessage,
+) (string, error) {
+	gologging.Debug(
+		"Racing platforms [" + joinPlatformNames(candidates) + "] for track " + track.ID,
+	)
+
+	raceCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan raceResult, len(candidates))
+	for _, p := range candidates {
+		p := p
+		trackCopy := *track
+		go func() {
+			path, err := p.Download(raceCtx, &trackCopy, statusMsg)
+			results <- raceResult{platform: p, path: path, err: err}
+		}()
+	}
+
+	var errs []string
+	for i := 0; i < len(candidates); i++ {
+		res := <-results
+
+		if res.err == nil {
+			cancel() // stop every other candidate immediately
+			gologging.Info(
+				"Race won by " + string(res.platform.Name()) + " -> " + res.path,
+			)
+			return res.path, nil
+		}
+
+		if errors.Is(res.err, context.Canceled) {
+			// Either this candidate lost the race, or the caller canceled
+			// the whole download - not a real failure either way.
+			continue
+		}
+
+		errMsg := string(res.platform.Name()) + ": " + res.err.Error()
+		gologging.Error("Race candidate failed: " + errMsg)
+		errs = append(errs, errMsg)
+	}
+
 	if len(errs) > 0 {
 		return "", combineErrors("Multiple download errors occurred", errs)
 	}
 
-	return "", errors.New("no downloader available for source: " + string(track.Source))
+	// Every candidate came back canceled - the caller's context was
+	// canceled (not a race loss for all of them, since one always "wins"
+	// unless the outer ctx itself died).
+	return "", context.Canceled
+}
+
+func joinPlatformNames(platforms []state.Platform) string {
+	names := make([]string, len(platforms))
+	for i, p := range platforms {
+		names[i] = string(p.Name())
+	}
+	return strings.Join(names, ", ")
+}
+
+var (
+	prefetching   = make(map[string]bool)
+	prefetchingMu sync.Mutex
+)
+
+// Prefetch warms up a track's download in the background, without
+// blocking the caller and without a status message. Call it as soon as the
+// current track starts playing, passing the next queued track, so its
+// stream URL is resolved (and its background disk-cache started) well
+// before it's actually needed - instead of only starting that work once
+// the current track finishes.
+//
+// Safe to call with a track that's already cached (no-op) or already being
+// prefetched (no-op, deduplicated by track ID).
+func Prefetch(track *state.Track) {
+	if track == nil {
+		return
+	}
+
+	if f := findFile(track); f != "" {
+		return
+	}
+
+	prefetchingMu.Lock()
+	if prefetching[track.ID] {
+		prefetchingMu.Unlock()
+		return
+	}
+	prefetching[track.ID] = true
+	prefetchingMu.Unlock()
+
+	go func() {
+		defer func() {
+			prefetchingMu.Lock()
+			delete(prefetching, track.ID)
+			prefetchingMu.Unlock()
+		}()
+
+		// Best-effort only: with many chats active at once, don't let
+		// background prefetching queue up for a yt-dlp slot that a real
+		// play request might need. If the pool's already full, just skip -
+		// the track will still download normally (without pre-warming)
+		// once it's actually needed.
+		if ytdlpBusy() {
+			gologging.Debug("Prefetch skipped (yt-dlp pool at capacity): " + track.ID)
+			return
+		}
+
+		gologging.Debug("Prefetching next track: " + track.ID)
+		if _, err := Download(context.Background(), track, nil); err != nil &&
+			!errors.Is(err, context.Canceled) {
+			gologging.Debug("Prefetch failed for " + track.ID + ": " + err.Error())
+		}
+	}()
 }
 
 // --- Helpers ---
