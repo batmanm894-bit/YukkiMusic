@@ -118,9 +118,12 @@ func (f *FallenApiPlatform) Download(
 		return downloadedPath, nil
 	}
 
-	// Direct CDN URL: stream it immediately for instant playback, and cache
-	// it to disk in the background so replays are instant too.
-	go f.cacheInBackground(dlURL, path)
+	// Background disk-caching disabled: on an ephemeral filesystem (e.g.
+	// Render's free tier), the downloads/ folder is wiped on every
+	// restart, so the cache rarely survives long enough to be reused -
+	// meanwhile this download still costs real CPU/bandwidth on an
+	// already CPU-constrained host. If persistent disk is available,
+	// this can be re-enabled: go f.cacheInBackground(dlURL, path)
 
 	return dlURL, nil
 }
