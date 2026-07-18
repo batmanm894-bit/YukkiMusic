@@ -305,6 +305,12 @@ type raceResult struct {
 	err      error
 }
 
+// raceStaggerDelay is how long a lower-priority race candidate waits
+// (multiplied by its position in the candidate list) before it starts,
+// giving higher-priority candidates a chance to win first without paying
+// the cost of running both at once.
+const raceStaggerDelay = 4 * time.Second
+
 // raceDownload runs every candidate platform's Download concurrently under
 // a shared cancellable context. Whichever platform returns success first
 // wins: its result is returned immediately and every other candidate is
@@ -331,10 +337,24 @@ func raceDownload(
 	defer cancel()
 
 	results := make(chan raceResult, len(candidates))
-	for _, p := range candidates {
-		p := p
+	for i, p := range candidates {
+		i, p := i, p
 		trackCopy := *track
 		go func() {
+			// Give earlier (higher-priority, usually cheaper) candidates a
+			// head start before starting this one. yt-dlp in particular
+			// spawns a real OS process - on a CPU-constrained host that's
+			// wasted work if a faster platform (e.g. FallenApi) is about
+			// to win anyway. If a higher-priority candidate already won
+			// during this wait, raceCtx is canceled and we skip entirely.
+			if i > 0 {
+				select {
+				case <-time.After(time.Duration(i) * raceStaggerDelay):
+				case <-raceCtx.Done():
+					results <- raceResult{platform: p, path: "", err: raceCtx.Err()}
+					return
+				}
+			}
 			path, err := p.Download(raceCtx, &trackCopy, statusMsg)
 			results <- raceResult{platform: p, path: path, err: err}
 		}()
