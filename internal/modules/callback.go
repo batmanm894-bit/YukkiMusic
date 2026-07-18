@@ -120,6 +120,8 @@ func roomHandle(cb *tg.CallbackQuery) error {
 		return handleMuteAction(cb, r)
 	case action == "unmute":
 		return handleUnmuteAction(cb, r)
+	case action == "autoplay_toggle":
+		return handleAutoplayToggleAction(cb, r)
 	default:
 		gologging.WarnF("Unknown callback action: %s", action)
 		cb.Answer(F(chatID, "unknown_action"), opt)
@@ -345,6 +347,34 @@ func handleStopAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 	})); err != nil {
 		gologging.ErrorF("Edit error: %v", err)
 	}
+	return tg.ErrEndGroup
+}
+
+func handleAutoplayToggleAction(cb *tg.CallbackQuery, r *core.RoomState) error {
+	opt := &tg.CallbackOptions{Alert: true}
+	chatID := cb.ChannelID()
+
+	current, err := database.Autoplay(chatID)
+	if err != nil {
+		cb.Answer(F(chatID, "autoplay_toggle_failed"), opt)
+		return tg.ErrEndGroup
+	}
+
+	newState := !current
+	if err := database.SetAutoplay(chatID, newState); err != nil {
+		cb.Answer(F(chatID, "autoplay_toggle_failed"), opt)
+		return tg.ErrEndGroup
+	}
+
+	cb.Answer(F(chatID, "autoplay_updated", locales.Arg{
+		"action": F(chatID, utils.IfElse(newState, "enabled", "disabled")),
+	}), opt)
+
+	playbackState := "playing"
+	if r.IsPaused() {
+		playbackState = "paused"
+	}
+	updatePlaybackMessage(cb, r, playbackState)
 	return tg.ErrEndGroup
 }
 
