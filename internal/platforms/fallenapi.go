@@ -108,7 +108,9 @@ func (f *FallenApiPlatform) Download(
 	// Telegram-hosted files must be downloaded via the Telegram client;
 	// there's no direct HTTP stream URL for them.
 	if telegramDLRegex.MatchString(dlURL) {
+		markDownloading(downloadKey(track))
 		downloadedPath, downloadErr := f.downloadFromTelegram(ctx, dlURL, path, pm)
+		unmarkDownloading(downloadKey(track))
 		if downloadErr != nil {
 			return "", downloadErr
 		}
