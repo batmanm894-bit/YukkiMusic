@@ -118,6 +118,16 @@ var youtubePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(youtube\.com|youtu\.be|music\.youtube\.com)`),
 }
 
+// withProxy appends "--proxy <PROXY_URL>" to args if a proxy is configured,
+// so yt-dlp subprocess calls route through the same proxy as the rest of
+// the app's outbound HTTP traffic (config.ProxyURL).
+func withProxy(args []string) []string {
+	if config.ProxyURL != "" {
+		return append(args, "--proxy", config.ProxyURL)
+	}
+	return args
+}
+
 func init() {
 	Register(60, &YtdlpPlatform{
 		name: PlatformYtDlp,
@@ -348,6 +358,7 @@ func (y *YtdlpPlatform) getStreamURL(
 		}
 	}
 
+	args = withProxy(args)
 	args = append(args, "--", safeURL)
 
 	release, err := acquireYtdlpSlot(ctx)
@@ -449,6 +460,7 @@ func (y *YtdlpPlatform) downloadToDisk(
 		}
 	}
 
+	args = withProxy(args)
 	args = append(args, "--", safeURL)
 
 	release, err := acquireYtdlpSlot(ctx)
@@ -463,13 +475,17 @@ func (y *YtdlpPlatform) downloadToDisk(
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	markDownloading(downloadKey(track))
+	runErr := cmd.Run()
+	unmarkDownloading(downloadKey(track))
+
+	if runErr != nil {
 		errStr := strings.TrimSpace(stderr.String())
 		outStr := strings.TrimSpace(stdout.String())
 
 		gologging.ErrorF(
 			"YtDlp: Download failed for %s: %v\nSTDOUT:\n%s\nSTDERR:\n%s",
-			track.URL, err, outStr, errStr,
+			track.URL, runErr, outStr, errStr,
 		)
 		findAndRemove(track)
 
@@ -477,7 +493,7 @@ func (y *YtdlpPlatform) downloadToDisk(
 			return "", ctx.Err()
 		}
 
-		return "", fmt.Errorf("yt-dlp error: %w", err)
+		return "", fmt.Errorf("yt-dlp error: %w", runErr)
 	}
 
 	path := findFile(track)
@@ -514,6 +530,7 @@ func (y *YtdlpPlatform) extractMetadata(urlStr string) (*ytdlpInfo, error) {
 		}
 	}
 
+	args = withProxy(args)
 	args = append(args, "--", safeURL)
 
 	release, err := acquireYtdlpSlot(ctx)
