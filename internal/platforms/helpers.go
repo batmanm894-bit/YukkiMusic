@@ -22,12 +22,61 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/Laky-64/gologging"
 	"github.com/amarnathcjd/gogram/telegram"
 
 	state "main/internal/core/models"
 )
+
+// inProgressDownloads tracks destination file paths that are currently
+// being written to by an active download. Multiple platforms can share the
+// same destination path for a given track ID (e.g. FallenApi and YtDlp both
+// write to downloads/audio_<id>.mp3), and some downloaders (gogram's
+// chunked writer, yt-dlp with --no-part) create/grow the file on disk
+// *before* it's complete. Without this tracker, findFile() would see that
+// partially-written file, assume it's a valid finished cache, and hand it
+// off to be played/uploaded while another goroutine is still writing to it
+// (or has just had its download canceled mid-write) - resulting in a
+// corrupt or missing file at playback time.
+var (
+	inProgressDownloads   = make(map[string]bool)
+	inProgressDownloadsMu sync.Mutex
+)
+
+// markDownloading records that a download for this key (see
+// downloadKey) is in progress. Call unmarkDownloading (typically via
+// defer) once the write finishes, whether it succeeded or failed.
+func markDownloading(key string) {
+	inProgressDownloadsMu.Lock()
+	inProgressDownloads[key] = true
+	inProgressDownloadsMu.Unlock()
+}
+
+func unmarkDownloading(key string) {
+	inProgressDownloadsMu.Lock()
+	delete(inProgressDownloads, key)
+	inProgressDownloadsMu.Unlock()
+}
+
+func isDownloading(key string) bool {
+	inProgressDownloadsMu.Lock()
+	defer inProgressDownloadsMu.Unlock()
+	return inProgressDownloads[key]
+}
+
+// downloadKey returns the tracker key for a track: its media type and ID,
+// without an extension. yt-dlp's output template leaves the final
+// extension unknown until the download completes, so the key can't be an
+// exact file path - it only needs to identify which track is in flight.
+func downloadKey(track *state.Track) string {
+	t := "audio"
+	if track.Video {
+		t = "video"
+	}
+	return t + "_" + track.ID
+}
 
 func getPath(track *state.Track, ext string) string {
 	if ext != "" && !strings.HasPrefix(ext, ".") {
@@ -55,6 +104,10 @@ func fileExists(path string) bool {
 }
 
 func findFile(track *state.Track) string {
+	if isDownloading(downloadKey(track)) {
+		return ""
+	}
+
 	t := "audio"
 	if track.Video {
 		t = "video"
