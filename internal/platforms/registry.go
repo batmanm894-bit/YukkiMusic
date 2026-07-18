@@ -187,6 +187,14 @@ func processSearchQuery(query string, video bool) ([]*state.Track, error) {
 	return nil, nil
 }
 
+// SearchQuery returns multiple YouTube search results for the given plain
+// text query (unlike the internal single-best-match search pipeline used
+// for /play). Used by callers (like the autoplay feature) that need several
+// candidate tracks to choose from without a *telegram.NewMessage context.
+func SearchQuery(query string, video bool) ([]*state.Track, error) {
+	return yt.GetTracks(query, video)
+}
+
 func processReplyChain(m *telegram.NewMessage) ([]*state.Track, error) {
 	gologging.Debug("Message is a reply, resolving media chain...")
 	target, isVideo, err := findMediaInReply(m)
