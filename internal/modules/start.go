@@ -130,8 +130,11 @@ func sendStartResponse(m *tg.NewMessage, caption string) error {
 	}
 
 	gologging.ErrorF("[start] image send failed: %v", err)
-	sendOpt.Media = ""
-	_, textErr := m.Respond(caption, sendOpt)
+	textOpt := &tg.SendOptions{
+		ReplyMarkup: sendOpt.ReplyMarkup,
+		Effect:      sendOpt.Effect,
+	}
+	_, textErr := m.Respond(caption, textOpt)
 	if textErr != nil {
 		gologging.ErrorF("[start] text send failed: %v", textErr)
 		return textErr
