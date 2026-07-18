@@ -68,9 +68,15 @@ func streamEndHandler(
 	var t *state.Track
 	var wasLooping bool
 	if len(r.Queue()) == 0 && r.Loop() == 0 {
-		core.DeleteRoom(chatID)
-		core.Bot.SendMessage(cid, F(cid, "stream_queue_finished"))
-		return
+		if next := autoplayNextTrack(cid, r); next != nil {
+			r.AddTracksToQueue([]*state.Track{next})
+			wasLooping = false
+			t = r.NextTrack()
+		} else {
+			core.DeleteRoom(chatID)
+			core.Bot.SendMessage(cid, F(cid, "stream_queue_finished"))
+			return
+		}
 	} else {
 		wasLooping = r.Loop() > 0
 		t = r.NextTrack()
