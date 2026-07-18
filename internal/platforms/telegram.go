@@ -318,6 +318,9 @@ func (t *TelegramPlatform) Download(
 	}
 	var err error
 
+	markDownloading(downloadKey(track))
+	defer unmarkDownloading(downloadKey(track))
+
 	msg, msgOk := telegramMsgCache.Get(track.ID)
 	doc, docOk := telegramDocCache.Get(track.ID)
 
