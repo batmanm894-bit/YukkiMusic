@@ -49,7 +49,8 @@ RUN useradd -r -u 10001 appuser && \
 WORKDIR /app
 
 COPY --from=builder /build/app /app/app
-RUN chown appuser:appuser /app/app
+COPY --from=builder /build/internal/modules/*.jpg /app/internal/modules/
+RUN chown -R appuser:appuser /app
 
 USER appuser
 
