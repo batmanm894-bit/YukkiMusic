@@ -24,6 +24,7 @@ import (
 	tg "github.com/amarnathcjd/gogram/telegram"
 
 	"main/internal/config"
+	"main/internal/database"
 	"main/internal/locales"
 	"main/internal/utils"
 )
@@ -131,20 +132,23 @@ func GetPlayMarkup(chatID int64, r *RoomState, queued bool) tg.ReplyMarkup {
 		)
 	}
 	btn.AddRow(
-		tg.Button.Data("▷", prefix+"resume"),
-		tg.Button.Data("II", prefix+"pause"),
-		tg.Button.Data("‣‣I", prefix+"skip"),
-		tg.Button.Data("▢", prefix+"stop"),
+		styleBtn("PAUSE", prefix+"pause", ""),
+		styleBtn("SKIP", prefix+"skip", ""),
+	)
+
+	autoplayOn, _ := database.Autoplay(chatID)
+	autoplayLabel := "🔁 Autoplay: OFF"
+	autoplayColour := ""
+	if autoplayOn {
+		autoplayLabel = "🔁 Autoplay: ON"
+		autoplayColour = "green"
+	}
+	btn.AddRow(
+		styleBtn(autoplayLabel, prefix+"autoplay_toggle", autoplayColour),
 	)
 
 	btn.AddRow(
-		tg.Button.Data("↩ 15s", prefix+"seekback_15"),
-		tg.Button.Data("⟳", prefix+"replay"),
-		tg.Button.Data("15s ↪", prefix+"seek_15"),
-	)
-
-	btn.AddRow(
-		tg.Button.Data(F(chatID, "CLOSE_BTN"), "close"),
+		styleBtn(F(chatID, "CLOSE_BTN"), "close", "blue"),
 	)
 
 	return btn.Build()
