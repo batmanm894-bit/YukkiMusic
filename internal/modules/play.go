@@ -349,6 +349,22 @@ func ensureVoiceChatReady(
 		return nil
 	}
 
+	// The cached snapshot says the assistant isn't here, but that could be
+	// stale (e.g. it was added to the chat some other way since we last
+	// checked, or a previous join actually succeeded without the cache
+	// getting updated). Re-verify with a live check before actually trying
+	// to join - joining when we're already a member risks tripping
+	// Telegram's flood-wait for no reason.
+	snap, err = cs.Snapshot(true)
+	if err != nil {
+		gologging.ErrorF("Error re-checking voicechat state: %v", err)
+		utils.EOR(replyMsg, getErrorMessage(chatID, err))
+		return err
+	}
+	if snap.AssistantPresent {
+		return nil
+	}
+
 	username := ""
 	if replyMsg.Channel != nil {
 		username = replyMsg.Channel.Username
@@ -607,6 +623,7 @@ func buildNowPlayingReply(
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       mention,
 		"source":   string(track.Source),
+		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 	return msg, opt
 }
