@@ -119,11 +119,20 @@ func GetPlayMarkup(chatID int64, r *RoomState, queued bool) tg.ReplyMarkup {
 		duration = track.Duration
 	}
 
-	progress := utils.GetProgressBar(r.Position(), duration)
-	progress = utils.FormatTime(
-		r.Position(),
-	) + " " + progress + " " + utils.FormatTime(
-		duration,
+	bar := utils.GetProgressBar(r.Position(), duration)
+	percent := 0
+	if duration > 0 {
+		percent = (r.Position() * 100) / duration
+		if percent > 100 {
+			percent = 100
+		}
+	}
+	progress := fmt.Sprintf(
+		"%s %d%% · %s / %s",
+		bar,
+		percent,
+		utils.FormatTime(r.Position()),
+		utils.FormatTime(duration),
 	)
 
 	if !queued {
@@ -136,7 +145,13 @@ func GetPlayMarkup(chatID int64, r *RoomState, queued bool) tg.ReplyMarkup {
 		styleBtn("SKIP", prefix+"skip", ""),
 	)
 
-	autoplayOn, _ := database.Autoplay(chatID)
+	autoplayOn := false
+	if ok, v := r.GetData("autoplay"); ok {
+		autoplayOn, _ = v.(bool)
+	} else {
+		autoplayOn, _ = database.Autoplay(chatID)
+		r.SetData("autoplay", autoplayOn)
+	}
 	autoplayLabel := "🔁 Autoplay: OFF"
 	autoplayColour := ""
 	if autoplayOn {
