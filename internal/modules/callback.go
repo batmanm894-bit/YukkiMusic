@@ -226,11 +226,12 @@ func handleReplayAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 	}
 
 	track := r.Track()
-	msgText := F(chatID, "stream_now_playing", locales.Arg{
+	msgText := F(chatID, nowPlayingKey(), locales.Arg{
 		"url":      track.URL,
 		"title":    utils.EscapeHTML(utils.ShortTitle(track.Title, 25)),
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       track.Requester,
+		"source":   string(track.Source),
 	})
 
 	sendOpt := &tg.SendOptions{
@@ -303,11 +304,12 @@ func handleSkipAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 	cb.Answer(F(chatID, "cb_skip_success"), opt)
 	cb.Delete()
 
-	msgText := F(chatID, "stream_now_playing", locales.Arg{
+	msgText := F(chatID, nowPlayingKey(), locales.Arg{
 		"url":      t.URL,
 		"title":    utils.EscapeHTML(utils.ShortTitle(t.Title, 25)),
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
+		"source":   string(t.Source),
 	})
 
 	sendOpt := &tg.SendOptions{
@@ -365,6 +367,7 @@ func handleAutoplayToggleAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 		cb.Answer(F(chatID, "autoplay_toggle_failed"), opt)
 		return tg.ErrEndGroup
 	}
+	r.SetData("autoplay", newState)
 
 	cb.Answer(F(chatID, "autoplay_updated", locales.Arg{
 		"action": F(chatID, utils.IfElse(newState, "enabled", "disabled")),
