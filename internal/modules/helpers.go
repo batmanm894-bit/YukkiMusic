@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"math/rand/v2"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -37,6 +38,17 @@ import (
 )
 
 var downloadCancels = make(map[int64]func())
+
+// nowPlayingTemplateCount is how many stream_now_playing_N variants exist
+// in the locale files (see internal/locales/en.yml).
+const nowPlayingTemplateCount = 3
+
+// nowPlayingKey returns a randomly chosen "now playing" message template
+// key, so the message looks a little different each time a track starts
+// instead of always using the exact same layout.
+func nowPlayingKey() string {
+	return fmt.Sprintf("stream_now_playing_%d", rand.IntN(nowPlayingTemplateCount)+1)
+}
 
 func getEffectiveRoom(m *tg.NewMessage, cplay bool) (*core.RoomState, error) {
 	chatID := m.ChannelID()
