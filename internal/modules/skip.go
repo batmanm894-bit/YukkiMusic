@@ -1,4 +1,3 @@
-
 /*
  * ● YukkiMusic
  * ○ A high-performance engine for streaming music in Telegram voicechats.
@@ -187,11 +186,12 @@ func handleSkip(m *telegram.NewMessage, cplay bool) error {
 	title := utils.ShortTitle(t.Title, 25)
 	safeTitle := utils.EscapeHTML(title)
 
-	msg := F(chatID, "stream_now_playing", locales.Arg{
+	msg := F(chatID, nowPlayingKey(), locales.Arg{
 		"url":      t.URL,
 		"title":    safeTitle,
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
+		"source":   string(t.Source),
 	})
 
 	opt := &telegram.SendOptions{
