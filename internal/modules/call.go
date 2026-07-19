@@ -132,11 +132,12 @@ func streamEndHandler(
 	title := utils.ShortTitle(t.Title, 25)
 	safeTitle := utils.EscapeHTML(title)
 
-	msgText := F(cid, "stream_now_playing", locales.Arg{
+	msgText := F(cid, nowPlayingKey(), locales.Arg{
 		"url":      t.URL,
 		"title":    safeTitle,
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
+		"source":   string(t.Source),
 	})
 
 	opt := &telegram.SendOptions{
