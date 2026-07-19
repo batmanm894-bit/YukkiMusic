@@ -601,11 +601,12 @@ func buildNowPlayingReply(
 		opt.Media = utils.CleanURL(track.Artwork)
 	}
 
-	msg := F(chatID, "stream_now_playing", locales.Arg{
+	msg := F(chatID, nowPlayingKey(), locales.Arg{
 		"url":      track.URL,
 		"title":    title,
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       mention,
+		"source":   string(track.Source),
 	})
 	return msg, opt
 }
