@@ -8,6 +8,7 @@ import (
 	tg "github.com/amarnathcjd/gogram/telegram"
 
 	"main/internal/core"
+	state "main/internal/core/models"
 	"main/internal/database"
 	"main/internal/locales"
 	"main/internal/utils"
@@ -144,8 +145,37 @@ func (s *CleanScheduler) flushDue(deadline time.Time) {
 	}
 }
 
+// deleteQueueMsg deletes the "Added to Queue: #N" message that was sent
+// when this track was queued, now that the track is starting to play (or
+// being skipped over) and that message no longer serves a purpose. No-op
+// for tracks that were played immediately and never had a queue message
+// (QueueMsgID == 0).
+func deleteQueueMsg(chatID int64, t *state.Track) {
+	if t == nil || t.QueueMsgID == 0 {
+		return
+	}
+	id := t.QueueMsgID
+	go func() {
+		if _, err := core.Bot.DeleteMessages(chatID, []int32{id}); err != nil {
+			gologging.DebugF("failed to delete queue message: %v", err)
+		}
+	}()
+}
+
+// scheduleOldPlayingMessage deletes the chat's previous "now playing" /
+// "added to queue" status message as soon as it's about to be replaced by a
+// new one (next track starting, skip, stop, etc). This runs unconditionally
+// - independent of the user-configurable Clean Mode setting and its
+// read-receipt-based delay (see CleanScheduler above), which exists for a
+// different purpose: cleaning up command messages. The old status message
+// is always stale the instant a new one is sent, so there's no reason to
+// wait on it.
 func scheduleOldPlayingMessage(r *core.RoomState) {
 	if m := r.StatusMsg(); m != nil {
-		cleanScheduler.schedule(m.ChannelID(), m.ID)
+		go func() {
+			if _, err := m.Delete(); err != nil {
+				gologging.DebugF("failed to delete old status message: %v", err)
+			}
+		}()
 	}
 }
