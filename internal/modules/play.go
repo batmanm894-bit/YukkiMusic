@@ -588,10 +588,13 @@ func finalizePlayReply(
 		}
 		return nil
 	}
-
+	
 	if len(tracks) == 1 {
 		msg, opts := buildSingleQueueReply(chatID, r, mainTrack, mention)
-		utils.EOR(replyMsg, msg, opts)
+		queueMsg, _ := utils.EOR(replyMsg, msg, opts)
+		if queueMsg != nil {
+			mainTrack.QueueMsgID = queueMsg.ID
+		}
 		return nil
 	}
 
@@ -623,6 +626,7 @@ func buildNowPlayingReply(
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       mention,
 		"source":   string(track.Source),
+		"bot":      core.Bot.Me().FirstName,
 		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 	return msg, opt
@@ -649,6 +653,7 @@ func buildSingleQueueReply(
 		"title":    title,
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       mention,
+		"bot":      core.Bot.Me().FirstName,
 	})
 	return msg, opt
 }
