@@ -79,7 +79,8 @@ func streamEndHandler(
 		}
 	} else {
 		wasLooping = r.Loop() > 0
-		t = r.NextTrack()
+		t = r.NextTrack() 
+		deleteQueueMsg(cid, t)
 	}
 
 	statusText := F(cid, "stream_downloading_next")
@@ -138,6 +139,7 @@ func streamEndHandler(
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
 		"source":   string(t.Source),
+		"bot":      core.Bot.Me().FirstName,
 		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
