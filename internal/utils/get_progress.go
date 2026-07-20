@@ -19,6 +19,7 @@ package utils
 
 import (
 	"fmt"
+	"math/rand/v2"
 
 	"github.com/amarnathcjd/gogram/telegram"
 )
@@ -55,32 +56,60 @@ func GetProgress(statusMsg *telegram.NewMessage) *telegram.ProgressManager {
 	return pm
 }
 
-var progressBarCache = [10]string{
-	"◉—————————",
-	"—◉————————",
-	"——◉———————",
-	"———◉——————",
-	"————◉—————",
-	"—————◉————",
-	"——————◉———",
-	"———————◉——",
-	"————————◉—",
-	"—————————◉",
+var miniBarCache = [10]string{
+	"▰▱▱▱▱▱▱▱▱▱",
+	"▰▰▱▱▱▱▱▱▱▱",
+	"▰▰▰▱▱▱▱▱▱▱",
+	"▰▰▰▰▱▱▱▱▱▱",
+	"▰▰▰▰▰▱▱▱▱▱",
+	"▰▰▰▰▰▰▱▱▱▱",
+	"▰▰▰▰▰▰▰▱▱▱",
+	"▰▰▰▰▰▰▰▰▱▱",
+	"▰▰▰▰▰▰▰▰▰▱",
+	"▰▰▰▰▰▰▰▰▰▰",
 }
 
-func GetProgressBar(playedSec, durationSec int) string {
-	if durationSec <= 0 || playedSec <= 0 {
-		return progressBarCache[0]
+// waveformBarCache mimics a WhatsApp voice-note waveform: the "played"
+// portion shows waveform peaks, the remaining portion is a flat line.
+var waveformBarCache = [10]string{
+	"▂▬▬▬▬▬▬▬▬▬",
+	"▂▄▬▬▬▬▬▬▬▬",
+	"▂▄▆▬▬▬▬▬▬▬",
+	"▂▄▆█▬▬▬▬▬▬",
+	"▂▄▆█▆▬▬▬▬▬",
+	"▂▄▆█▆▄▬▬▬▬",
+	"▂▄▆█▆▄▂▬▬▬",
+	"▂▄▆█▆▄▂▄▬▬",
+	"▂▄▆█▆▄▂▄▆▬",
+	"▂▄▆█▆▄▂▄▆█",
+}
+
+// GetProgressBar returns a progress bar for the given playback position.
+// style selects which visual style to use: 0 = filled mini-bar,
+// 1 = WhatsApp-style waveform. Callers should pick the style once per
+// track (e.g. cache it on the room) rather than re-randomizing on every
+// call, since this is re-rendered every few seconds while a track plays.
+func GetProgressBar(playedSec, durationSec, style int) string {
+	index := 0
+	if durationSec > 0 && playedSec > 0 {
+		if playedSec >= durationSec {
+			index = 9
+		} else {
+			index = (playedSec * 10) / durationSec
+			if index > 9 {
+				index = 9
+			}
+		}
 	}
 
-	if playedSec >= durationSec {
-		return progressBarCache[9]
+	if style == 0 {
+		return miniBarCache[index]
 	}
+	return waveformBarCache[index]
+}
 
-	index := (playedSec * 10) / durationSec
-	if index > 9 {
-		index = 9
-	}
-
-	return progressBarCache[index]
+// RandomProgressBarStyle returns a random style index for GetProgressBar
+// (0 or 1). Call this once per track and reuse the result.
+func RandomProgressBarStyle() int {
+	return rand.IntN(2)
 }
