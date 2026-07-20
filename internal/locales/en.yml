@@ -493,11 +493,13 @@ play_download_failed: |
   Error: <code>{error}</code>
 
 play_added_to_queue_single: |
-  <blockquote><b>🎵 Added to Queue:</b> #{index}</blockquote>
+  🎵 —— <a href="{bot_link}"><b>{bot}</b></a> —— 🎵
 
-  <blockquote><b>▫ Track:</b> <a href="{url}">{title}</a></blockquote>
-  <blockquote><b>▫ Duration:</b> {duration}</blockquote>
-  <blockquote><b>▫ Requested by:</b> {by}</blockquote>
+  ▸ <a href="{url}"><b>{title}</b></a>
+
+  <pre>┌ Queue #    {index}
+  ├ Duration   {duration}
+  └ For        {by}</pre>
 
 play_multiple_tracks_too_long_header: "<b>⚠️ {count} tracks were skipped (max duration {limit_mins} mins):</b>"
 play_multiple_tracks_too_long_item: "— <i>{title}</i>"
