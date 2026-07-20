@@ -47,6 +47,7 @@ func (r *RoomState) Play(t *state.Track, path string, force ...bool) error {
 	r.mu.Lock()
 	if r.Data != nil {
 		delete(r.Data, "last_queue")
+		delete(r.Data, "bar_style")
 	}
 
 	shouldQueue := !forcePlay && r.playing && r.track != nil
