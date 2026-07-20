@@ -121,7 +121,7 @@ func handleSkip(m *telegram.NewMessage, cplay bool) error {
 			}))
 			return telegram.ErrEndGroup
 		}
-		_ = r.NextTrack()
+		deleteQueueMsg(chatID, r.NextTrack())
 	}
 
 	if len(r.Queue()) == 0 {
@@ -144,7 +144,7 @@ func handleSkip(m *telegram.NewMessage, cplay bool) error {
 		}))
 		return telegram.ErrEndGroup
 	}
-
+    deleteQueueMsg(chatID, t)
 	statusMsg, err := core.Bot.SendMessage(
 		chatID,
 		F(chatID, "stream_downloading_next"),
@@ -192,6 +192,7 @@ func handleSkip(m *telegram.NewMessage, cplay bool) error {
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
 		"source":   string(t.Source),
+		"bot":      core.Bot.Me().FirstName,
 		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
