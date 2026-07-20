@@ -232,6 +232,7 @@ func handleReplayAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       track.Requester,
 		"source":   string(track.Source),
+		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
 	sendOpt := &tg.SendOptions{
@@ -310,6 +311,7 @@ func handleSkipAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
 		"source":   string(t.Source),
+		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
 	sendOpt := &tg.SendOptions{
