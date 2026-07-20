@@ -232,6 +232,7 @@ func handleReplayAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 		"duration": utils.FormatDuration(track.Duration),
 		"by":       track.Requester,
 		"source":   string(track.Source),
+		"bot":      core.Bot.Me().FirstName,
 		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
@@ -274,6 +275,7 @@ func handleSkipAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 
 	r.SetLoop(0)
 	t := r.NextTrack()
+	deleteQueueMsg(chatID, t)
 
 	statusMsg, err := cb.Respond(F(chatID, "stream_downloading_next"))
 	if err != nil {
@@ -311,6 +313,7 @@ func handleSkipAction(cb *tg.CallbackQuery, r *core.RoomState) error {
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
 		"source":   string(t.Source),
+		"bot":      core.Bot.Me().FirstName,
 		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
