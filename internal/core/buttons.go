@@ -119,7 +119,15 @@ func GetPlayMarkup(chatID int64, r *RoomState, queued bool) tg.ReplyMarkup {
 		duration = track.Duration
 	}
 
-	bar := utils.GetProgressBar(r.Position(), duration)
+	barStyle := 0
+	if ok, v := r.GetData("bar_style"); ok {
+		barStyle, _ = v.(int)
+	} else {
+		barStyle = utils.RandomProgressBarStyle()
+		r.SetData("bar_style", barStyle)
+	}
+
+	bar := utils.GetProgressBar(r.Position(), duration, barStyle)
 	percent := 0
 	if duration > 0 {
 		percent = (r.Position() * 100) / duration
@@ -127,13 +135,7 @@ func GetPlayMarkup(chatID int64, r *RoomState, queued bool) tg.ReplyMarkup {
 			percent = 100
 		}
 	}
-	progress := fmt.Sprintf(
-		"%s %d%% · %s / %s",
-		bar,
-		percent,
-		utils.FormatTime(r.Position()),
-		utils.FormatTime(duration),
-	)
+	progress := fmt.Sprintf("%s %d%%", bar, percent)
 
 	if !queued {
 		btn.AddRow(
