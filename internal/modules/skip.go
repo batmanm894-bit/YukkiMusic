@@ -192,6 +192,7 @@ func handleSkip(m *telegram.NewMessage, cplay bool) error {
 		"duration": utils.FormatDuration(t.Duration),
 		"by":       t.Requester,
 		"source":   string(t.Source),
+		"bot_link": "https://t.me/" + core.Bot.Me().Username + "?start=start",
 	})
 
 	opt := &telegram.SendOptions{
