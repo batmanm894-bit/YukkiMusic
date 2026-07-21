@@ -27,7 +27,6 @@ import (
 	"github.com/Laky-64/gologging"
 
 	state "main/internal/core/models"
-	"main/internal/database"
 	"main/ntgcalls"
 )
 
@@ -466,8 +465,7 @@ func (r *RoomState) Unmute() (bool, error) {
 }
 
 func (r *RoomState) play() error {
-	fxEnabled, _ := database.AudioFX(r.ChatID)
-	desc := getMediaDescription(r.filePath, r.position, r.speed, r.track.Video, r.track.Title, fxEnabled)
+	desc := getMediaDescription(r.filePath, r.position, r.speed, r.track.Video, r.track.Title)
 	return r.Assistant.Ntg.Play(r.ID, desc)
 }
 
@@ -477,7 +475,6 @@ func getMediaDescription(
 	speed float64,
 	isVideo bool,
 	title string,
-	fxEnabled bool,
 ) ntgcalls.MediaDescription {
 	if speed < 0.5 {
 		speed = 0.5
@@ -494,7 +491,7 @@ func getMediaDescription(
 	}
 	baseCmd += "-v warning -i \"" + url + "\" "
 
-	audio := getAudioPipeline(baseCmd, speed, title, fxEnabled)
+	audio := getAudioPipeline(baseCmd, speed, title)
 	if !isVideo {
 		return ntgcalls.MediaDescription{
 			Microphone: audio,
@@ -508,18 +505,31 @@ func getMediaDescription(
 	}
 }
 
-// audioEnhanceFilter applies standard loudness normalization (the same
-// technique streaming platforms use) so every track plays back at a
-// consistent, clean volume - no clipping. It's always applied last, after
-// any mood-specific coloring below.
-const audioEnhanceFilter = "loudnorm=I=-16:TP=-1.5:LRA=11"
+// audioEnhanceFilter applies loudness normalization tuned to match what
+// Spotify and YouTube target on their own streams (-14 LUFS integrated,
+// -1 dBTP true peak) instead of the more conservative broadcast standard,
+// so tracks feel comparably loud/clean to those platforms. It's always
+// applied last, after any mood-specific coloring below - and by itself
+// (when no mood match is found) it IS the "clean, Spotify-style" sound:
+// no extra bass/treble coloring, just a clean, consistently-loud master.
+const audioEnhanceFilter = "loudnorm=I=-14:TP=-1:LRA=11"
+
+// highQualityResample runs audio through the soxr resampler (a
+// significantly higher-quality resampling algorithm than ffmpeg's
+// default) before anything else touches it, reducing the small amount of
+// artifacting that speed/EQ/loudnorm filters can otherwise introduce.
+const highQualityResample = "aresample=resampler=soxr:precision=28"
 
 // moodFilter does a best-effort guess at a track's vibe from its title
-// text alone (no real audio/genre analysis happens) and returns an extra
-// ffmpeg filter fragment to color the sound accordingly. Titles with none
-// of these keywords get no extra coloring - just the clean loudnorm above.
-// This is a coarse heuristic: it will miss plenty of romantic/attitude/
-// Punjabi tracks whose titles don't happen to contain a matching word.
+// text alone (title usually already includes the artist/song name, e.g.
+// "DAKU | INDERPAL MOGA | ..." - no separate artist field exists). If a
+// genre/mood is recognized, it returns an extra ffmpeg filter fragment to
+// color the sound accordingly. If nothing matches, it returns "" and the
+// track just gets the clean Spotify-style loudnorm treatment above with
+// no extra coloring - this is the intentional fallback, not a missing
+// feature. This is a coarse heuristic: it will miss plenty of romantic/
+// attitude/Punjabi tracks whose titles don't happen to contain a
+// matching word, in which case they also get the clean fallback sound.
 func moodFilter(title string) string {
 	t := strings.ToLower(title)
 
@@ -537,6 +547,7 @@ func moodFilter(title string) string {
 		return "bass=g=2:f=80:width_type=o:w=1,treble=g=2:f=5000:width_type=o:w=1,acompressor=threshold=-18dB:ratio=3:attack=5:release=50"
 
 	default:
+		// Nothing recognized - clean Spotify-style sound, no extra coloring.
 		return ""
 	}
 }
@@ -569,7 +580,6 @@ func getAudioPipeline(
 	baseCmd string,
 	speed float64,
 	title string,
-	fxEnabled bool,
 ) *ntgcalls.AudioDescription {
 	audio := &ntgcalls.AudioDescription{
 		MediaSource:  ntgcalls.MediaSourceShell,
@@ -577,11 +587,9 @@ func getAudioPipeline(
 		ChannelCount: 2,
 	}
 
-	filterChain := "atempo=" + strconv.FormatFloat(speed, 'f', 2, 64)
-	if fxEnabled {
-		if extra := moodFilter(title); extra != "" {
-			filterChain += "," + extra
-		}
+	filterChain := highQualityResample + ",atempo=" + strconv.FormatFloat(speed, 'f', 2, 64)
+	if extra := moodFilter(title); extra != "" {
+		filterChain += "," + extra
 	}
 	filterChain += "," + audioEnhanceFilter
 
