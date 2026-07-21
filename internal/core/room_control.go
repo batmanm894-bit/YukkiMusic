@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Laky-64/gologging"
 
 	state "main/internal/core/models"
+	"main/internal/database"
 	"main/ntgcalls"
 )
 
@@ -464,7 +466,8 @@ func (r *RoomState) Unmute() (bool, error) {
 }
 
 func (r *RoomState) play() error {
-	desc := getMediaDescription(r.filePath, r.position, r.speed, r.track.Video)
+	fxEnabled, _ := database.AudioFX(r.ChatID)
+	desc := getMediaDescription(r.filePath, r.position, r.speed, r.track.Video, r.track.Title, fxEnabled)
 	return r.Assistant.Ntg.Play(r.ID, desc)
 }
 
@@ -473,6 +476,8 @@ func getMediaDescription(
 	pos int,
 	speed float64,
 	isVideo bool,
+	title string,
+	fxEnabled bool,
 ) ntgcalls.MediaDescription {
 	if speed < 0.5 {
 		speed = 0.5
@@ -489,7 +494,7 @@ func getMediaDescription(
 	}
 	baseCmd += "-v warning -i \"" + url + "\" "
 
-	audio := getAudioPipeline(baseCmd, speed)
+	audio := getAudioPipeline(baseCmd, speed, title, fxEnabled)
 	if !isVideo {
 		return ntgcalls.MediaDescription{
 			Microphone: audio,
@@ -503,9 +508,68 @@ func getMediaDescription(
 	}
 }
 
+// audioEnhanceFilter applies standard loudness normalization (the same
+// technique streaming platforms use) so every track plays back at a
+// consistent, clean volume - no clipping. It's always applied last, after
+// any mood-specific coloring below.
+const audioEnhanceFilter = "loudnorm=I=-16:TP=-1.5:LRA=11"
+
+// moodFilter does a best-effort guess at a track's vibe from its title
+// text alone (no real audio/genre analysis happens) and returns an extra
+// ffmpeg filter fragment to color the sound accordingly. Titles with none
+// of these keywords get no extra coloring - just the clean loudnorm above.
+// This is a coarse heuristic: it will miss plenty of romantic/attitude/
+// Punjabi tracks whose titles don't happen to contain a matching word.
+func moodFilter(title string) string {
+	t := strings.ToLower(title)
+
+	switch {
+	case containsAny(t, punjabiKeywords):
+		// Energetic, dhol-driven: heavy low end, bright top end.
+		return "bass=g=5:f=60:width_type=o:w=1,treble=g=3:f=9000:width_type=o:w=1"
+
+	case containsAny(t, romanticKeywords):
+		// Soft and warm: gentle low boost, tamed highs, light reverb-like echo.
+		return "bass=g=3:f=100:width_type=o:w=1,treble=g=-2:f=8000:width_type=o:w=1,aecho=0.6:0.4:35:0.2"
+
+	case containsAny(t, attitudeKeywords):
+		// Punchy and forward: tight bass, presence boost, a bit of compression.
+		return "bass=g=2:f=80:width_type=o:w=1,treble=g=2:f=5000:width_type=o:w=1,acompressor=threshold=-18dB:ratio=3:attack=5:release=50"
+
+	default:
+		return ""
+	}
+}
+
+func containsAny(s string, words []string) bool {
+	for _, w := range words {
+		if strings.Contains(s, w) {
+			return true
+		}
+	}
+	return false
+}
+
+var (
+	punjabiKeywords = []string{
+		"punjabi", "bhangra", "jatt", "sardar", "pind", "moga",
+		"chandigarh", "desi hip hop",
+	}
+	romanticKeywords = []string{
+		"pyar", "pyaar", "ishq", "mohabbat", "sanam", "romantic",
+		"love song", "yaad", "judaai", "mohabbatein", "dil",
+	}
+	attitudeKeywords = []string{
+		"attitude", "boss", "daku", "gunda", "villain", "swag",
+		"sherni", "dabangg", "gangster",
+	}
+)
+
 func getAudioPipeline(
 	baseCmd string,
 	speed float64,
+	title string,
+	fxEnabled bool,
 ) *ntgcalls.AudioDescription {
 	audio := &ntgcalls.AudioDescription{
 		MediaSource:  ntgcalls.MediaSourceShell,
@@ -513,13 +577,16 @@ func getAudioPipeline(
 		ChannelCount: 2,
 	}
 
+	filterChain := "atempo=" + strconv.FormatFloat(speed, 'f', 2, 64)
+	if fxEnabled {
+		if extra := moodFilter(title); extra != "" {
+			filterChain += "," + extra
+		}
+	}
+	filterChain += "," + audioEnhanceFilter
+
 	audioCmd := baseCmd
-	audioCmd += "-filter:a \"atempo=" + strconv.FormatFloat(
-		speed,
-		'f',
-		2,
-		64,
-	) + "\" "
+	audioCmd += "-filter:a \"" + filterChain + "\" "
 	audioCmd += "-f s16le -ac " + strconv.Itoa(int(audio.ChannelCount)) + " "
 	audioCmd += "-ar " + strconv.Itoa(int(audio.SampleRate)) + " "
 	audioCmd += "pipe:1"
