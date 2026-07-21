@@ -210,8 +210,7 @@ func (s *ShrutiAPIPlatform) downloadFromURL(
 	dlURL, path string,
 	pm *telegram.ProgressManager,
 ) error {
-	req := rc.R().SetContext(ctx).SetOutput(path)
-	resp, err := req.Get(dlURL)
+	resp, err := rc.R().SetContext(ctx).Get(dlURL)
 	if err != nil {
 		os.Remove(path)
 		if errors.Is(err, context.Canceled) ||
@@ -222,12 +221,15 @@ func (s *ShrutiAPIPlatform) downloadFromURL(
 	}
 
 	if resp.StatusCode() >= 400 {
-		os.Remove(path)
 		return fmt.Errorf("download failed with status: %d", resp.StatusCode())
+	}
+
+	if err := os.WriteFile(path, resp.Bytes(), 0o600); err != nil {
+		os.Remove(path)
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 
 	_ = pm // reserved: wire up progress reporting here if/when needed
 
 	return nil
 }
-
