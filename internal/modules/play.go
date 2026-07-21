@@ -173,6 +173,11 @@ func cplayHandler(m *tg.NewMessage) error { return handlePlay(m, &playOpts{CPlay
 func handlePlay(m *tg.NewMessage, opts *playOpts) error {
 	chatID := m.ChannelID()
 
+	// Always delete the /play command message right away, in every chat -
+	// unlike CommandDelete/CleanMode (see helpers.go), this isn't gated
+	// behind a per-chat setting, so it needs no /cmddelete configuration.
+	go m.Delete()
+
 	if !canUsePlayCommand(m, chatID) {
 		m.Reply(F(chatID, "playmode_restricted"))
 		return tg.ErrEndGroup
