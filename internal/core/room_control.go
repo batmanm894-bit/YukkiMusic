@@ -587,7 +587,7 @@ func getAudioPipeline(
 		ChannelCount: 2,
 	}
 
-	filterChain := highQualityResample + ",atempo=" + strconv.FormatFloat(speed, 'f', 2, 64)
+	filterChain := "atempo=" + strconv.FormatFloat(speed, 'f', 2, 64)
 	if extra := moodFilter(title); extra != "" {
 		filterChain += "," + extra
 	}
