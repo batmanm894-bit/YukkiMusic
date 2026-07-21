@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Laky-64/gologging"
@@ -286,25 +287,54 @@ func fetchTracksAndCheckStatus(
 	r *core.RoomState,
 	video bool,
 ) ([]*state.Track, bool, error) {
-	tracks, err := safeGetTracks(m, replyMsg, m.ChannelID(), video)
-	if err != nil {
-		utils.EOR(replyMsg, err.Error())
-		return nil, false, err
+	// Track search (YouTube API call) and getting the assistant into the
+	// voice chat are independent of each other - the assistant doesn't
+	// need to know which track was picked just to join. Running them
+	// concurrently means the assistant is already on its way into the
+	// call while the search is still resolving, instead of waiting for
+	// search to fully finish first.
+	var (
+		tracks    []*state.Track
+		tracksErr error
+		vcErr     error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		tracks, tracksErr = safeGetTracks(m, replyMsg, m.ChannelID(), video)
+	}()
+
+	go func() {
+		defer wg.Done()
+		chatState, err := core.GetChatState(r.ID)
+		if err != nil {
+			gologging.ErrorF("Error getting chat state: %v", err)
+			utils.EOR(replyMsg, getErrorMessage(m.ChannelID(), err))
+			vcErr = err
+			return
+		}
+		vcErr = ensureVoiceChatReady(m.ChannelID(), replyMsg, chatState)
+	}()
+
+	wg.Wait()
+
+	// Track-search problems take priority in what we report back - there's
+	// no point surfacing a voice-chat error if we couldn't even find the
+	// song. ensureVoiceChatReady/chatState already sent their own error
+	// message via EOR when vcErr is non-nil, so nothing extra to send here.
+	if tracksErr != nil {
+		utils.EOR(replyMsg, tracksErr.Error())
+		return nil, false, tracksErr
 	}
 	if len(tracks) == 0 {
 		utils.EOR(replyMsg, F(m.ChannelID(), "no_song_found"))
 		return nil, false, fmt.Errorf("no tracks found")
 	}
-
-	chatState, err := core.GetChatState(r.ID)
-	if err != nil {
-		gologging.ErrorF("Error getting chat state: %v", err)
-		utils.EOR(replyMsg, getErrorMessage(m.ChannelID(), err))
-		return nil, false, err
-	}
-
-	if err := ensureVoiceChatReady(m.ChannelID(), replyMsg, chatState); err != nil {
-		return nil, false, err
+	if vcErr != nil {
+		return nil, false, vcErr
 	}
 
 	return tracks, r.IsActiveChat(), nil
