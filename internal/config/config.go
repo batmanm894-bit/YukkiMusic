@@ -1,4 +1,4 @@
-/*
+ /*
  * ● YukkiMusic
  * ○ A high-performance engine for streaming music in Telegram voicechats.
  *
@@ -45,7 +45,9 @@ var (
 	SpotifyClientID     string
 	SpotifyClientSecret string
 	FallenAPIURL        string
-	FallenAPIKey        string
+	FallenAPIKeys       []string
+	ShrutiAPIURLs       []string
+	ShrutiAPIKeys       []string
 	DefaultLang         string
 	DurationLimit       int
 	LeaveOnDemoted      bool
@@ -124,7 +126,16 @@ func loadConfig() {
 	SpotifyClientID = getString("SPOTIFY_CLIENT_ID", "")
 	SpotifyClientSecret = getString("SPOTIFY_CLIENT_SECRET", "")
 	FallenAPIURL = getString("FALLEN_API_URL", "https://api.onegrab.fun")
-	FallenAPIKey = getString("FALLEN_API_KEY", "")
+	FallenAPIKeys = getStringSlice("FALLEN_API_KEY", nil)
+	ShrutiAPIURLs = getStringSlice(
+		"SHRUTI_API_URL",
+		[]string{
+			"https://shrutibots.site",
+			"https://api.shrutibots.site",
+			"https://api01.shrutibots.site",
+		},
+	)
+	ShrutiAPIKeys = getStringSlice("SHRUTI_API_KEY", nil)
 	DefaultLang = getString("DEFAULT_LANG", "en")
 	DurationLimit = int(getInt64("DURATION_LIMIT", 4200))
 	LeaveOnDemoted = getBool("LEAVE_ON_DEMOTED", false)
