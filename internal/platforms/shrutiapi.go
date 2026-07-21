@@ -103,26 +103,45 @@ func (s *ShrutiAPIPlatform) Download(
 		return f, nil
 	}
 
+	// Video has to be muxed/downloaded before it can play at all, so
+	// there's no instant path for it - same restriction as FallenApi/YtDlp.
+	if track.Video {
+		return s.downloadToDisk(ctx, track, statusMsg)
+	}
+
+	dlURL, err := s.getDownloadURL(ctx, track.ID, "audio")
+	if err != nil {
+		return "", err
+	}
+
+	// Mirrors FallenApi/YtDlp: hand back the resolved URL directly so
+	// ffmpeg streams from it immediately instead of waiting for a full
+	// download first. No background disk-caching here on purpose - on
+	// Render's free tier the downloads/ folder is wiped on every restart
+	// anyway, so caching would just spend extra CPU/bandwidth on an
+	// already-constrained host for a cache that rarely survives to be
+	// reused.
+	return dlURL, nil
+}
+
+// downloadToDisk is the old full-download path, kept only for video (which
+// must be a local muxed file before ntgcalls can play it).
+func (s *ShrutiAPIPlatform) downloadToDisk(
+	ctx context.Context,
+	track *state.Track,
+	statusMsg *telegram.NewMessage,
+) (string, error) {
 	var pm *telegram.ProgressManager
 	if statusMsg != nil {
 		pm = utils.GetProgress(statusMsg)
 	}
 
-	mediaType := "audio"
-	if track.Video {
-		mediaType = "video"
-	}
-
-	dlURL, err := s.getDownloadURL(ctx, track.ID, mediaType)
+	dlURL, err := s.getDownloadURL(ctx, track.ID, "video")
 	if err != nil {
 		return "", err
 	}
 
-	ext := ".mp3"
-	if track.Video {
-		ext = ".mp4"
-	}
-	path := getPath(track, ext)
+	path := getPath(track, ".mp4")
 
 	markDownloading(downloadKey(track))
 	defer unmarkDownloading(downloadKey(track))
