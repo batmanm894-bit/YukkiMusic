@@ -217,7 +217,6 @@ func (f *FallenApiPlatform) getDownloadURL(
 	gologging.Error(lastErr.Error())
 	return "", lastErr
 }
-}
 
 func (f *FallenApiPlatform) downloadFromURL(
 	ctx context.Context,
