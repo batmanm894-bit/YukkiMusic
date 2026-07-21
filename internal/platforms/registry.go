@@ -340,16 +340,23 @@ func raceDownload(
 	for i, p := range candidates {
 		i, p := i, p
 		trackCopy := *track
+
+		// Only stagger platforms that spawn a real OS process (currently
+		// just yt-dlp). Lightweight HTTP-API candidates (FallenApi,
+		// ShrutiAPI, ...) are cheap to run concurrently - staggering them
+		// too only added artificial latency without saving any real
+		// resources, since they don't touch CPU/RAM the way a subprocess
+		// does. yt-dlp still waits, so it isn't spawned at all if a
+		// cheaper candidate has already won by the time its turn comes.
+		delay := time.Duration(0)
+		if p.Name() == PlatformYtDlp {
+			delay = time.Duration(i) * raceStaggerDelay
+		}
+
 		go func() {
-			// Give earlier (higher-priority, usually cheaper) candidates a
-			// head start before starting this one. yt-dlp in particular
-			// spawns a real OS process - on a CPU-constrained host that's
-			// wasted work if a faster platform (e.g. FallenApi) is about
-			// to win anyway. If a higher-priority candidate already won
-			// during this wait, raceCtx is canceled and we skip entirely.
-			if i > 0 {
+			if delay > 0 {
 				select {
-				case <-time.After(time.Duration(i) * raceStaggerDelay):
+				case <-time.After(delay):
 				case <-raceCtx.Done():
 					results <- raceResult{platform: p, path: "", err: raceCtx.Err()}
 					return
