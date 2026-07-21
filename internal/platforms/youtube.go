@@ -476,26 +476,50 @@ func (p *YouTubePlatform) callInnerTube(endpoint string, body, result any) error
 		endpoint,
 		innerTubeKey,
 	)
-	req := rc.R().
-		SetBody(body).
-		SetResult(result).
-		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
 
-	if cookieHeader, err := cookies.GetRandomCookieHeader(); err == nil && cookieHeader != "" {
-		req.SetHeader("Cookie", cookieHeader)
+	// YouTube occasionally rejects a request with 403/429 even though the
+	// exact same request succeeds seconds later (transient bot-check /
+	// rate-limit, especially common from shared/datacenter IPs). Retrying
+	// a couple of times with a short backoff turns most of these into a
+	// success instead of surfacing "no tracks found" to the user.
+	const maxAttempts = 3
+	var lastErr error
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 800 * time.Millisecond)
+		}
+
+		req := rc.R().
+			SetBody(body).
+			SetResult(result).
+			SetHeader("Content-Type", "application/json").
+			SetHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36")
+
+		if cookieHeader, err := cookies.GetRandomCookieHeader(); err == nil && cookieHeader != "" {
+			req.SetHeader("Cookie", cookieHeader)
+		}
+
+		resp, err := req.Post(apiURL)
+		if err != nil {
+			lastErr = fmt.Errorf("innertube request failed: %w", err)
+			continue
+		}
+
+		if resp.StatusCode() >= 400 {
+			lastErr = fmt.Errorf("innertube error: %d", resp.StatusCode())
+			// Only retry on errors that are typically transient. A hard
+			// 404/401 etc. won't fix itself with a retry.
+			if resp.StatusCode() == 403 || resp.StatusCode() == 429 || resp.StatusCode() >= 500 {
+				continue
+			}
+			return lastErr
+		}
+
+		return nil
 	}
 
-	resp, err := req.Post(apiURL)
-	if err != nil {
-		return fmt.Errorf("innertube request failed: %w", err)
-	}
-
-	if resp.StatusCode() >= 400 {
-		return fmt.Errorf("innertube error: %d", resp.StatusCode())
-	}
-
-	return nil
+	return lastErr
 }
 
 func (p *YouTubePlatform) parseNodes(
