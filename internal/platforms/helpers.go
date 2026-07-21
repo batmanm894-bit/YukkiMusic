@@ -19,6 +19,7 @@ package platforms
 
 import (
 	"errors"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,6 +30,19 @@ import (
 
 	state "main/internal/core/models"
 )
+
+// shuffledKeys returns a copy of keys in random order, so repeated calls
+// (e.g. one per song played) spread usage evenly across all configured API
+// keys instead of always hitting the first one first and only reaching the
+// others once it's exhausted for the day.
+func shuffledKeys(keys []string) []string {
+	shuffled := make([]string, len(keys))
+	copy(shuffled, keys)
+	rand.Shuffle(len(shuffled), func(i, j int) {
+		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
+	})
+	return shuffled
+}
 
 // inProgressDownloads tracks destination file paths that are currently
 // being written to by an active download. Multiple platforms can share the
