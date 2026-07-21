@@ -74,7 +74,7 @@ func (f *FallenApiPlatform) GetTracks(
 func (f *FallenApiPlatform) CanDownload(
 	source state.PlatformName,
 ) bool {
-	if config.FallenAPIURL == "" || config.FallenAPIKey == "" {
+	if config.FallenAPIURL == "" || len(config.FallenAPIKeys) == 0 {
 		return false
 	}
 	return source == PlatformYouTube
@@ -156,53 +156,67 @@ func (f *FallenApiPlatform) getDownloadURL(
 	ctx context.Context,
 	mediaURL string,
 ) (string, error) {
-	apiReqURL := fmt.Sprintf(
-		"%s/api/track?api_key=%s&url=%s",
-		config.FallenAPIURL,
-		config.FallenAPIKey,
-		url.QueryEscape(mediaURL),
-	)
+	var lastErr error
 
-	var apiResp apiResponse
+	for _, key := range shuffledKeys(config.FallenAPIKeys) {
+		apiReqURL := fmt.Sprintf(
+			"%s/api/track?api_key=%s&url=%s",
+			config.FallenAPIURL,
+			key,
+			url.QueryEscape(mediaURL),
+		)
 
-	resp, err := rc.R().
-		SetContext(ctx).
-		SetResult(&apiResp).
-		Get(apiReqURL)
-	if err != nil {
-		if errors.Is(err, context.Canceled) ||
-			errors.Is(err, context.DeadlineExceeded) {
-			return "", err
+		var apiResp apiResponse
+
+		resp, err := rc.R().
+			SetContext(ctx).
+			SetResult(&apiResp).
+			Get(apiReqURL)
+		if err != nil {
+			if errors.Is(err, context.Canceled) ||
+				errors.Is(err, context.DeadlineExceeded) {
+				return "", err
+			}
+			lastErr = fmt.Errorf(
+				"failed to download %s, api request failed: %w", mediaURL,
+				sanitizeAPIError(err, key),
+			)
+			continue
 		}
 
-		return "", fmt.Errorf(
-			"failed to download %s, api request failed: %w", mediaURL,
-			sanitizeAPIError(err, config.FallenAPIKey),
-		)
+		if resp.StatusCode() >= 400 {
+			// A quota/rate-limit style failure (429) is exactly the case
+			// where trying the next key makes sense - other statuses
+			// (bad request, not found, etc.) would fail the same way on
+			// every key too, but there's no harm in still moving on.
+			lastErr = sanitizeAPIError(fmt.Errorf(
+				"failed to download %s, api request failed with status: %d body: %s",
+				mediaURL,
+				resp.StatusCode(),
+				resp.String(),
+			), key)
+			gologging.Debug("FallenApi: key failed, trying next -> " + lastErr.Error())
+			continue
+		}
+
+		if apiResp.CdnUrl == "" {
+			lastErr = sanitizeAPIError(fmt.Errorf(
+				"failed to download %s, empty API response body: %s",
+				mediaURL,
+				resp.String(),
+			), key)
+			continue
+		}
+
+		return apiResp.CdnUrl, nil
 	}
 
-	if resp.StatusCode() >= 400 {
-		err = sanitizeAPIError(fmt.Errorf(
-			"failed to download %s, api request failed with status: %d body: %s",
-			mediaURL,
-			resp.StatusCode(),
-			resp.String(),
-		), config.FallenAPIKey)
-		gologging.Error(err.Error())
-		return "", err
+	if lastErr == nil {
+		lastErr = errors.New("fallenapi: no keys configured")
 	}
-
-	if apiResp.CdnUrl == "" {
-		err = sanitizeAPIError(fmt.Errorf(
-			"failed to download %s, empty API response body: %s",
-			mediaURL,
-			resp.String(),
-		), config.FallenAPIKey)
-		gologging.Error(err.Error())
-		return "", err
-	}
-
-	return apiResp.CdnUrl, nil
+	gologging.Error(lastErr.Error())
+	return "", lastErr
+}
 }
 
 func (f *FallenApiPlatform) downloadFromURL(
