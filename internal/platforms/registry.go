@@ -309,7 +309,7 @@ type raceResult struct {
 // (multiplied by its position in the candidate list) before it starts,
 // giving higher-priority candidates a chance to win first without paying
 // the cost of running both at once.
-const raceStaggerDelay = 4 * time.Second
+const raceStaggerDelay = 2 * time.Second
 
 // raceDownload runs every candidate platform's Download concurrently under
 // a shared cancellable context. Whichever platform returns success first
