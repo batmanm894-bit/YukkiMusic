@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Laky-64/gologging"
@@ -465,7 +464,7 @@ func (r *RoomState) Unmute() (bool, error) {
 }
 
 func (r *RoomState) play() error {
-	desc := getMediaDescription(r.filePath, r.position, r.speed, r.track.Video, r.track.Title)
+	desc := getMediaDescription(r.filePath, r.position, r.speed, r.track.Video)
 	return r.Assistant.Ntg.Play(r.ID, desc)
 }
 
@@ -474,7 +473,6 @@ func getMediaDescription(
 	pos int,
 	speed float64,
 	isVideo bool,
-	title string,
 ) ntgcalls.MediaDescription {
 	if speed < 0.5 {
 		speed = 0.5
@@ -491,7 +489,7 @@ func getMediaDescription(
 	}
 	baseCmd += "-v warning -i \"" + url + "\" "
 
-	audio := getAudioPipeline(baseCmd, speed, title)
+	audio := getAudioPipeline(baseCmd, speed)
 	if !isVideo {
 		return ntgcalls.MediaDescription{
 			Microphone: audio,
@@ -505,93 +503,44 @@ func getMediaDescription(
 	}
 }
 
-// audioEnhanceFilter applies loudness normalization tuned to match what
-// Spotify and YouTube target on their own streams (-14 LUFS integrated,
-// -1 dBTP true peak) instead of the more conservative broadcast standard,
-// so tracks feel comparably loud/clean to those platforms. It's always
-// applied last, after any mood-specific coloring below - and by itself
-// (when no mood match is found) it IS the "clean, Spotify-style" sound:
-// no extra bass/treble coloring, just a clean, consistently-loud master.
-const audioEnhanceFilter = "loudnorm=I=-14:TP=-1:LRA=11"
-
-// highQualityResample runs audio through the soxr resampler (a
-// significantly higher-quality resampling algorithm than ffmpeg's
-// default) before anything else touches it, reducing the small amount of
-// artifacting that speed/EQ/loudnorm filters can otherwise introduce.
-const highQualityResample = "aresample=resampler=soxr:precision=28"
-
-// moodFilter does a best-effort guess at a track's vibe from its title
-// text alone (title usually already includes the artist/song name, e.g.
-// "DAKU | INDERPAL MOGA | ..." - no separate artist field exists). If a
-// genre/mood is recognized, it returns an extra ffmpeg filter fragment to
-// color the sound accordingly. If nothing matches, it returns "" and the
-// track just gets the clean Spotify-style loudnorm treatment above with
-// no extra coloring - this is the intentional fallback, not a missing
-// feature. This is a coarse heuristic: it will miss plenty of romantic/
-// attitude/Punjabi tracks whose titles don't happen to contain a
-// matching word, in which case they also get the clean fallback sound.
-func moodFilter(title string) string {
-	t := strings.ToLower(title)
-
-	switch {
-	case containsAny(t, punjabiKeywords):
-		// Energetic, dhol-driven: heavy low end, bright top end.
-		return "bass=g=5:f=60:width_type=o:w=1,treble=g=3:f=9000:width_type=o:w=1"
-
-	case containsAny(t, romanticKeywords):
-		// Soft and warm: gentle low boost, tamed highs, light reverb-like echo.
-		return "bass=g=3:f=100:width_type=o:w=1,treble=g=-2:f=8000:width_type=o:w=1,aecho=0.6:0.4:35:0.2"
-
-	case containsAny(t, attitudeKeywords):
-		// Punchy and forward: tight bass, presence boost, a bit of compression.
-		return "bass=g=2:f=80:width_type=o:w=1,treble=g=2:f=5000:width_type=o:w=1,acompressor=threshold=-18dB:ratio=3:attack=5:release=50"
-
-	default:
-		// Nothing recognized - clean Spotify-style sound, no extra coloring.
-		return ""
-	}
-}
-
-func containsAny(s string, words []string) bool {
-	for _, w := range words {
-		if strings.Contains(s, w) {
-			return true
-		}
-	}
-	return false
-}
-
-var (
-	punjabiKeywords = []string{
-		"punjabi", "bhangra", "jatt", "sardar", "pind", "moga",
-		"chandigarh", "desi hip hop",
-	}
-	romanticKeywords = []string{
-		"pyar", "pyaar", "ishq", "mohabbat", "sanam", "romantic",
-		"love song", "yaad", "judaai", "mohabbatein", "dil",
-	}
-	attitudeKeywords = []string{
-		"attitude", "boss", "daku", "gunda", "villain", "swag",
-		"sherni", "dabangg", "gangster",
-	}
-)
+// audioEnhanceFilter gives consistent, Spotify-comparable perceived
+// loudness using dynaudnorm instead of loudnorm. loudnorm analyzes with
+// look-ahead buffering, which is noticeably CPU-heavier in a real-time
+// pipe; dynaudnorm normalizes frame-by-frame with no look-ahead, costing
+// a fraction of the CPU for effectively the same perceived result. This
+// matters most on CPU-constrained hosts (e.g. Render's free tier), where
+// every extra bit of real-time filter cost risks the PCM pipe falling
+// behind and causing audible glitches/stutter in the voice chat.
+const audioEnhanceFilter = "dynaudnorm=f=200:g=15:p=0.7:m=8"
 
 func getAudioPipeline(
 	baseCmd string,
 	speed float64,
-	title string,
 ) *ntgcalls.AudioDescription {
 	audio := &ntgcalls.AudioDescription{
-		MediaSource:  ntgcalls.MediaSourceShell,
-		SampleRate:   96000,
+		MediaSource: ntgcalls.MediaSourceShell,
+		// Telegram voice chats are carried over Opus, which tops out at
+		// 48kHz - encoding/transmitting at 96kHz added zero real quality
+		// (virtually no source track exceeds 48kHz to begin with) while
+		// doubling the PCM data ffmpeg has to produce in real time and
+		// forcing ntgcalls to downsample again before it can encode.
+		// 48kHz is Opus's native ceiling, so quality is identical here
+		// for roughly half the CPU/throughput cost.
+		SampleRate:   48000,
 		ChannelCount: 2,
 	}
 
-	filterChain := "atempo=" + strconv.FormatFloat(speed, 'f', 2, 64)
-	if extra := moodFilter(title); extra != "" {
-		filterChain += "," + extra
+	// atempo only costs CPU when it's actually doing something. At the
+	// default 1.0x speed it's a no-op pass-through, so skip it entirely
+	// for the common case (most plays never touch /speed) instead of
+	// running it on every track for nothing. dynaudnorm stays on
+	// unconditionally - it's cheap (no look-ahead, frame-by-frame) and
+	// is what gives consistent, comparable-loudness sound across tracks.
+	filterChain := audioEnhanceFilter
+	if speed != 1.0 {
+		filterChain = "atempo=" + strconv.FormatFloat(speed, 'f', 2, 64) +
+			"," + filterChain
 	}
-	filterChain += "," + audioEnhanceFilter
 
 	audioCmd := baseCmd
 	audioCmd += "-filter:a \"" + filterChain + "\" "
