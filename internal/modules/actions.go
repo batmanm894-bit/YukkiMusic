@@ -121,10 +121,10 @@ func handleVoiceChatAction(m *telegram.NewMessage, action *telegram.MessageActio
 		room, ok := core.GetRoom(chatID, nil, false)
 		go func() {
 			time.Sleep(500 * time.Millisecond)
-			if ok {
+			if ok && room != nil && !room.IsDestroyed() {
 				scheduleOldPlayingMessage(room)
+				core.DeleteRoom(chatID)
 			}
-			core.DeleteRoom(chatID)
 			gologging.DebugF("Room destroyed for ended voice chat in %d", chatID)
 		}()
 	}
