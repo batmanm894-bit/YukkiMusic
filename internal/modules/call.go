@@ -42,6 +42,19 @@ func streamEndHandler(
 	}
 
 	gologging.DebugF("[onStreamEndHandler] Stream ended in chat %d", chatID)
+
+	// This handler is invoked directly from the ntgcalls callback (registered
+	// via a.Ntg.OnStreamEnd), which is NOT wrapped by SafeMessageHandler like
+	// the regular command handlers are. Any unrecovered panic here (e.g. a
+	// nil *state.Track slipping through a race on the room's queue/loop
+	// state) would crash the whole process and cause the bot to restart.
+	defer func() {
+		if rec := recover(); rec != nil {
+			gologging.ErrorF("[onStreamEndHandler] recovered panic for chat %d: %v", chatID, rec)
+			core.DeleteRoom(chatID)
+		}
+	}()
+
 	ass, err := core.Assistants.ForChat(chatID)
 	if err != nil {
 		gologging.ErrorF("Failed to get Assistant for %d: %v", chatID, err)
@@ -79,8 +92,15 @@ func streamEndHandler(
 		}
 	} else {
 		wasLooping = r.Loop() > 0
-		t = r.NextTrack() 
+		t = r.NextTrack()
 		deleteQueueMsg(cid, t)
+	}
+
+	if t == nil {
+		gologging.DebugF("[onStreamEndHandler] No track resolved for chat %d, ending stream", cid)
+		core.DeleteRoom(chatID)
+		core.Bot.SendMessage(cid, F(cid, "stream_queue_finished"))
+		return
 	}
 
 	statusText := F(cid, "stream_downloading_next")
