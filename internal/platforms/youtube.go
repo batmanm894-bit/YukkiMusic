@@ -403,6 +403,17 @@ func (p *YouTubePlatform) fetchPlaylist(
 	return tracks, nil
 }
 
+// GetSimilarTracks returns YouTube's own "Mix" recommendations for a
+// video - the same same-vibe/similar-genre curation YouTube's own player
+// uses for its "up next" queue. Unlike searching by the previous track's
+// title text (which mostly just resurfaces other uploads of that exact
+// same song), this genuinely diversifies into different-but-similar
+// tracks, which is what a "keep similar music going" autoplay feature
+// should actually be doing.
+func GetSimilarTracks(videoID string, limit int) ([]*state.Track, error) {
+	return yt.fetchMixPlaylist("RD"+videoID, limit)
+}
+
 func (p *YouTubePlatform) fetchMixPlaylist(
 	playlistID string,
 	limit int,
