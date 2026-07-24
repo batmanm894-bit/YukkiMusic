@@ -86,6 +86,13 @@ func autoplayHandler(m *tg.NewMessage) error {
 	return tg.ErrEndGroup
 }
 
+// autoplayHistoryKey is the RoomState.Data key holding every track ID
+// played in this room's session (manually queued or autoplay-picked),
+// so autoplay never repeats a track already heard this session - not
+// even the original manually-requested track that autoplay branched off
+// from.
+const autoplayHistoryKey = "autoplay_history"
+
 // autoplayNextTrack finds a track similar to the last one played in the
 // given room, to keep music going when the queue runs out. It returns nil
 // if autoplay is disabled for the chat, there's no track to base the
@@ -101,6 +108,11 @@ func autoplayNextTrack(chatID int64, r *core.RoomState) *state.Track {
 		return nil
 	}
 
+	// Record the track autoplay is branching off from too (it may have
+	// been manually /play'd and never added to history otherwise), so it
+	// can never be re-suggested later in this session either.
+	pushAutoplayHistory(r, last.ID)
+
 	query := cleanAutoplayQuery(last.Title)
 	if query == "" {
 		return nil
@@ -111,15 +123,51 @@ func autoplayNextTrack(chatID int64, r *core.RoomState) *state.Track {
 		return nil
 	}
 
+	history := autoplayHistory(r)
+
 	for _, track := range tracks {
-		if track == nil || track.ID == last.ID {
+		if track == nil || containsID(history, track.ID) {
 			continue
 		}
 		track.Requester = F(chatID, "autoplay_requester")
+		pushAutoplayHistory(r, track.ID)
 		return track
 	}
 
 	return nil
+}
+
+// autoplayHistory reads every track ID played so far in this room's
+// session.
+func autoplayHistory(r *core.RoomState) []string {
+	ok, v := r.GetData(autoplayHistoryKey)
+	if !ok {
+		return nil
+	}
+	history, _ := v.([]string)
+	return history
+}
+
+// pushAutoplayHistory records a played track ID for this session, unless
+// it's already recorded.
+func pushAutoplayHistory(r *core.RoomState, trackID string) {
+	if trackID == "" {
+		return
+	}
+	history := autoplayHistory(r)
+	if containsID(history, trackID) {
+		return
+	}
+	r.SetData(autoplayHistoryKey, append(history, trackID))
+}
+
+func containsID(ids []string, id string) bool {
+	for _, existing := range ids {
+		if existing == id {
+			return true
+		}
+	}
+	return false
 }
 
 // cleanAutoplayQuery strips common noise (official video/audio tags,
