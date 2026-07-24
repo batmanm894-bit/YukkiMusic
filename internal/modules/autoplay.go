@@ -87,11 +87,33 @@ func autoplayHandler(m *tg.NewMessage) error {
 }
 
 // autoplayHistoryKey is the RoomState.Data key holding every track ID
-// played in this room's session (manually queued or autoplay-picked),
-// so autoplay never repeats a track already heard this session - not
-// even the original manually-requested track that autoplay branched off
-// from.
+// AND normalized title played in this room's session (manually queued or
+// autoplay-picked), so autoplay never repeats a track already heard this
+// session - whether it's the exact same upload (same ID) or a different
+// upload of the same song (same title, different ID), and whether it was
+// the original manually-requested track or one autoplay picked itself.
 const autoplayHistoryKey = "autoplay_history"
+
+// autoplayCandidates returns tracks worth trying for autoplay's next pick.
+// For YouTube-sourced tracks, it uses YouTube's own "Mix" recommendations
+// (the same same-vibe curation YouTube's own player uses for "up next"),
+// which actually diversifies into different-but-similar tracks. For
+// anything else, it falls back to searching by the previous track's
+// (cleaned) title.
+func autoplayCandidates(last *state.Track) ([]*state.Track, error) {
+	if last.Source == platforms.PlatformYouTube && last.ID != "" {
+		tracks, err := platforms.GetSimilarTracks(last.ID, 10)
+		if err == nil && len(tracks) > 0 {
+			return tracks, nil
+		}
+	}
+
+	query := cleanAutoplayQuery(last.Title)
+	if query == "" {
+		return nil, nil
+	}
+	return platforms.SearchQuery(query, false)
+}
 
 // autoplayNextTrack finds a track similar to the last one played in the
 // given room, to keep music going when the queue runs out. It returns nil
@@ -111,14 +133,9 @@ func autoplayNextTrack(chatID int64, r *core.RoomState) *state.Track {
 	// Record the track autoplay is branching off from too (it may have
 	// been manually /play'd and never added to history otherwise), so it
 	// can never be re-suggested later in this session either.
-	pushAutoplayHistory(r, last.ID)
+	pushAutoplayHistory(r, last.ID, last.Title)
 
-	query := cleanAutoplayQuery(last.Title)
-	if query == "" {
-		return nil
-	}
-
-	tracks, err := platforms.SearchQuery(query, false)
+	tracks, err := autoplayCandidates(last)
 	if err != nil || len(tracks) == 0 {
 		return nil
 	}
@@ -126,48 +143,76 @@ func autoplayNextTrack(chatID int64, r *core.RoomState) *state.Track {
 	history := autoplayHistory(r)
 
 	for _, track := range tracks {
-		if track == nil || containsID(history, track.ID) {
+		if track == nil {
+			continue
+		}
+		if containsEntry(history, track.ID, track.Title) {
 			continue
 		}
 		track.Requester = F(chatID, "autoplay_requester")
-		pushAutoplayHistory(r, track.ID)
+		pushAutoplayHistory(r, track.ID, track.Title)
 		return track
 	}
 
 	return nil
 }
 
-// autoplayHistory reads every track ID played so far in this room's
-// session.
-func autoplayHistory(r *core.RoomState) []string {
+// autoplayHistoryEntry pairs a video ID with its normalized title so a
+// candidate can be matched on either.
+type autoplayHistoryEntry struct {
+	ID    string
+	Title string
+}
+
+// autoplayHistory reads everything played so far in this room's session.
+func autoplayHistory(r *core.RoomState) []autoplayHistoryEntry {
 	ok, v := r.GetData(autoplayHistoryKey)
 	if !ok {
 		return nil
 	}
-	history, _ := v.([]string)
+	history, _ := v.([]autoplayHistoryEntry)
 	return history
 }
 
-// pushAutoplayHistory records a played track ID for this session, unless
-// it's already recorded.
-func pushAutoplayHistory(r *core.RoomState, trackID string) {
-	if trackID == "" {
+// pushAutoplayHistory records a played track (by ID and normalized title)
+// for this session, unless it's already recorded.
+func pushAutoplayHistory(r *core.RoomState, trackID, title string) {
+	if trackID == "" && title == "" {
 		return
 	}
 	history := autoplayHistory(r)
-	if containsID(history, trackID) {
+	if containsEntry(history, trackID, title) {
 		return
 	}
-	r.SetData(autoplayHistoryKey, append(history, trackID))
+	r.SetData(autoplayHistoryKey, append(history, autoplayHistoryEntry{
+		ID:    trackID,
+		Title: normalizeAutoplayTitle(title),
+	}))
 }
 
-func containsID(ids []string, id string) bool {
-	for _, existing := range ids {
-		if existing == id {
+// containsEntry reports whether a track (by exact ID, or by a song title
+// that normalizes the same as something already heard - e.g. a different
+// upload of the same song) has already been seen this session.
+func containsEntry(history []autoplayHistoryEntry, id, title string) bool {
+	normalized := normalizeAutoplayTitle(title)
+	for _, existing := range history {
+		if id != "" && existing.ID == id {
+			return true
+		}
+		if normalized != "" && existing.Title == normalized {
 			return true
 		}
 	}
 	return false
+}
+
+// normalizeAutoplayTitle strips the same noise cleanAutoplayQuery does and
+// lowercases the result, so different uploads of the same song (e.g.
+// "Daku (Official Video)" vs "Daku (Lyrical Video)" vs a slightly
+// re-punctuated re-upload) are recognized as the same song rather than
+// "new" content.
+func normalizeAutoplayTitle(title string) string {
+	return strings.ToLower(strings.TrimSpace(cleanAutoplayQuery(title)))
 }
 
 // cleanAutoplayQuery strips common noise (official video/audio tags,
