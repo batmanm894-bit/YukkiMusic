@@ -19,6 +19,7 @@ package platforms
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -34,30 +35,21 @@ import (
 
 const PlatformShrutiAPI state.PlatformName = "ShrutiAPI"
 
-// shrutiAPIResponse covers the field names we can reasonably expect from a
-// download-link API. The exact schema wasn't published with the API
-// announcement, so this checks a handful of common key names - adjust the
-// json tags below if the real response uses something else.
-type shrutiAPIResponse struct {
-	URL         string `json:"url"`
-	DownloadURL string `json:"download_url"`
-	Link        string `json:"link"`
-	CdnURL      string `json:"cdnurl"`
+// shrutiAPIErrorResponse covers the JSON shape ShrutiAPI sends back on
+// failure (e.g. invalid key, rate limit). On success it does NOT return
+// JSON at all - it streams the raw audio/video bytes directly as the
+// response body - so this is only used to extract a readable message when
+// something goes wrong.
+type shrutiAPIErrorResponse struct {
+	Message string `json:"message"`
+	Error   string `json:"error"`
 }
 
-func (r shrutiAPIResponse) resolvedURL() string {
-	switch {
-	case r.URL != "":
-		return r.URL
-	case r.DownloadURL != "":
-		return r.DownloadURL
-	case r.Link != "":
-		return r.Link
-	case r.CdnURL != "":
-		return r.CdnURL
-	default:
-		return ""
+func (r shrutiAPIErrorResponse) text() string {
+	if r.Message != "" {
+		return r.Message
 	}
+	return r.Error
 }
 
 type ShrutiAPIPlatform struct {
@@ -102,30 +94,14 @@ func (s *ShrutiAPIPlatform) Download(
 		gologging.Debug("ShrutiAPI: Download -> Cached File -> " + f)
 		return f, nil
 	}
-
-	// Video has to be muxed/downloaded before it can play at all, so
-	// there's no instant path for it - same restriction as FallenApi/YtDlp.
-	if track.Video {
-		return s.downloadToDisk(ctx, track, statusMsg)
-	}
-
-	dlURL, err := s.getDownloadURL(ctx, track.ID, "audio")
-	if err != nil {
-		return "", err
-	}
-
-	// Mirrors FallenApi/YtDlp: hand back the resolved URL directly so
-	// ffmpeg streams from it immediately instead of waiting for a full
-	// download first. No background disk-caching here on purpose - on
-	// Render's free tier the downloads/ folder is wiped on every restart
-	// anyway, so caching would just spend extra CPU/bandwidth on an
-	// already-constrained host for a cache that rarely survives to be
-	// reused.
-	return dlURL, nil
+	return s.downloadToDisk(ctx, track, statusMsg)
 }
 
-// downloadToDisk is the old full-download path, kept only for video (which
-// must be a local muxed file before ntgcalls can play it).
+// downloadToDisk fetches the track from ShrutiAPI and writes it straight
+// to disk. ShrutiAPI serves the media file directly in the response body
+// (confirmed from logs: a raw fragmented-mp4/m4a container), not a JSON
+// object pointing to a separate URL - so there's no "instant stream" path
+// like FallenApi's CDN links; every request is a full download.
 func (s *ShrutiAPIPlatform) downloadToDisk(
 	ctx context.Context,
 	track *state.Track,
@@ -136,17 +112,18 @@ func (s *ShrutiAPIPlatform) downloadToDisk(
 		pm = utils.GetProgress(statusMsg)
 	}
 
-	dlURL, err := s.getDownloadURL(ctx, track.ID, "video")
-	if err != nil {
-		return "", err
+	mediaType := "audio"
+	ext := ".m4a"
+	if track.Video {
+		mediaType = "video"
+		ext = ".mp4"
 	}
-
-	path := getPath(track, ".mp4")
+	path := getPath(track, ext)
 
 	markDownloading(downloadKey(track))
 	defer unmarkDownloading(downloadKey(track))
 
-	if err := s.downloadFromURL(ctx, dlURL, path, pm); err != nil {
+	if err := s.fetchAndSave(ctx, track.ID, mediaType, path, pm); err != nil {
 		return "", err
 	}
 
@@ -157,16 +134,18 @@ func (s *ShrutiAPIPlatform) downloadToDisk(
 	return path, nil
 }
 
-// getDownloadURL picks a random key each call (so usage spreads evenly
+// fetchAndSave picks a random key each call (so usage spreads evenly
 // across all configured keys instead of always starting with the first
 // one), and tries each configured base URL in order for that key (the
 // announcement says the three endpoints are interchangeable). If a key is
 // exhausted (daily limit, etc.) on every URL, it falls through to the next
-// key.
-func (s *ShrutiAPIPlatform) getDownloadURL(
+// key. On success, the response body (raw media bytes) is written
+// directly to path.
+func (s *ShrutiAPIPlatform) fetchAndSave(
 	ctx context.Context,
-	videoID, mediaType string,
-) (string, error) {
+	videoID, mediaType, path string,
+	pm *telegram.ProgressManager,
+) error {
 	var lastErr error
 
 	for _, key := range shuffledKeys(config.ShrutiAPIKeys) {
@@ -179,16 +158,11 @@ func (s *ShrutiAPIPlatform) getDownloadURL(
 				key,
 			)
 
-			var apiResp shrutiAPIResponse
-
-			resp, err := rc.R().
-				SetContext(ctx).
-				SetResult(&apiResp).
-				Get(apiReqURL)
+			resp, err := rc.R().SetContext(ctx).Get(apiReqURL)
 			if err != nil {
 				if errors.Is(err, context.Canceled) ||
 					errors.Is(err, context.DeadlineExceeded) {
-					return "", err
+					return err
 				}
 				lastErr = sanitizeAPIError(
 					fmt.Errorf("shrutiapi request to %s failed: %w", base, err),
@@ -198,22 +172,33 @@ func (s *ShrutiAPIPlatform) getDownloadURL(
 			}
 
 			if resp.StatusCode() >= 400 {
+				msg := resp.String()
+				var errResp shrutiAPIErrorResponse
+				if jsonErr := json.Unmarshal(resp.Bytes(), &errResp); jsonErr == nil && errResp.text() != "" {
+					msg = errResp.text()
+				}
 				lastErr = sanitizeAPIError(fmt.Errorf(
 					"shrutiapi request to %s failed with status: %d body: %s",
-					base, resp.StatusCode(), resp.String(),
+					base, resp.StatusCode(), msg,
 				), key)
 				gologging.Debug("ShrutiAPI: key/url failed, trying next -> " + lastErr.Error())
 				continue
 			}
 
-			if dl := apiResp.resolvedURL(); dl != "" {
-				return dl, nil
+			body := resp.Bytes()
+			if len(body) == 0 {
+				lastErr = sanitizeAPIError(fmt.Errorf(
+					"shrutiapi at %s returned an empty response", base,
+				), key)
+				continue
 			}
 
-			lastErr = sanitizeAPIError(fmt.Errorf(
-				"shrutiapi at %s returned no download url, body: %s",
-				base, resp.String(),
-			), key)
+			if err := os.WriteFile(path, body, 0o600); err != nil {
+				return fmt.Errorf("failed to write file: %w", err)
+			}
+
+			_ = pm // reserved: wire up progress reporting here if/when needed
+			return nil
 		}
 	}
 
@@ -221,34 +206,5 @@ func (s *ShrutiAPIPlatform) getDownloadURL(
 		lastErr = errors.New("shrutiapi: no keys/endpoints configured")
 	}
 	gologging.Error(lastErr.Error())
-	return "", lastErr
-}
-
-func (s *ShrutiAPIPlatform) downloadFromURL(
-	ctx context.Context,
-	dlURL, path string,
-	pm *telegram.ProgressManager,
-) error {
-	resp, err := rc.R().SetContext(ctx).Get(dlURL)
-	if err != nil {
-		os.Remove(path)
-		if errors.Is(err, context.Canceled) ||
-			errors.Is(err, context.DeadlineExceeded) {
-			return err
-		}
-		return fmt.Errorf("http download failed: %w", err)
-	}
-
-	if resp.StatusCode() >= 400 {
-		return fmt.Errorf("download failed with status: %d", resp.StatusCode())
-	}
-
-	if err := os.WriteFile(path, resp.Bytes(), 0o600); err != nil {
-		os.Remove(path)
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	_ = pm // reserved: wire up progress reporting here if/when needed
-
-	return nil
+	return lastErr
 }
