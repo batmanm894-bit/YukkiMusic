@@ -135,8 +135,8 @@ func pingHandler(m *tg.NewMessage) error {
 		gologging.ErrorF("[ping] edit failed: %v", err)
 
 		if config.PingImage != "" {
-			opt.Media = ""
-			_, err = reply.Edit(msg, opt)
+			textOpt := &tg.SendOptions{ReplyMarkup: opt.ReplyMarkup}
+			_, err = reply.Edit(msg, textOpt)
 			if err != nil {
 				gologging.ErrorF("[ping] fallback text edit failed: %v", err)
 				return err
@@ -145,3 +145,4 @@ func pingHandler(m *tg.NewMessage) error {
 	}
 	return tg.ErrEndGroup
 }
+
