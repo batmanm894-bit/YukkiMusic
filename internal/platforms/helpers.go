@@ -18,9 +18,11 @@
 package platforms
 
 import (
+	"context"
 	"errors"
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -206,4 +208,31 @@ func playableMedia(m *telegram.NewMessage) (bool, bool) {
 	}
 
 	return check(m)
+}
+
+// verifyMediaFile checks that a downloaded audio/video file is actually
+// playable, using ffprobe to confirm it has valid, readable stream data.
+// This catches files that were saved successfully at the HTTP layer (no
+// error, non-empty body) but are truncated/corrupt underneath - e.g. the
+// connection dropped mid-transfer without the server signaling an error,
+// so the caller never saw a Go-level error and would otherwise treat the
+// partial file as a valid download. Returns nil if the file looks valid,
+// or an error describing what's wrong (the caller should discard the file
+// and treat this as a failed attempt rather than a successful one).
+func verifyMediaFile(ctx context.Context, path string) error {
+	cmd := exec.CommandContext(ctx,
+		"ffprobe",
+		"-v", "error",
+		"-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		path,
+	)
+	out, err := cmd.Output()
+	if err != nil {
+		return errors.New("file failed validation (likely truncated/corrupt): " + err.Error())
+	}
+	if strings.TrimSpace(string(out)) == "" {
+		return errors.New("file failed validation: no duration reported (likely truncated/corrupt)")
+	}
+	return nil
 }
