@@ -197,6 +197,15 @@ func (s *ShrutiAPIPlatform) fetchAndSave(
 				return fmt.Errorf("failed to write file: %w", err)
 			}
 
+			if err := verifyMediaFile(ctx, path); err != nil {
+				os.Remove(path)
+				lastErr = sanitizeAPIError(fmt.Errorf(
+					"shrutiapi at %s returned a corrupt/truncated file: %w", base, err,
+				), key)
+				gologging.Debug("ShrutiAPI: " + lastErr.Error())
+				continue
+			}
+
 			_ = pm // reserved: wire up progress reporting here if/when needed
 			return nil
 		}
