@@ -347,7 +347,7 @@ func (y *YtdlpPlatform) getStreamURL(
 		"--no-playlist",
 		"--no-warnings",
 		"--no-check-certificate",
-		"-f", "ba[abr>=180][abr<=360]/ba",
+		"-f", "ba[abr>=180][abr<=360]/ba/b",
 		"-g",
 	}
 
@@ -446,7 +446,7 @@ func (y *YtdlpPlatform) downloadToDisk(
 		)
 	} else {
 		args = append(args,
-			"-f", "ba[abr>=180][abr<=360]/ba",
+			"-f", "ba[abr>=180][abr<=360]/ba/b",
 			"-x",
 			"--concurrent-fragments", "4",
 		)
