@@ -162,7 +162,7 @@ func (s *ShrutiAPIPlatform) fetchAndSave(
 			if err != nil {
 				if errors.Is(err, context.Canceled) ||
 					errors.Is(err, context.DeadlineExceeded) {
-					return err
+					return sanitizeAPIError(err, key)
 				}
 				lastErr = sanitizeAPIError(
 					fmt.Errorf("shrutiapi request to %s failed: %w", base, err),
