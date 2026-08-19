@@ -175,7 +175,7 @@ func (f *FallenApiPlatform) getDownloadURL(
 		if err != nil {
 			if errors.Is(err, context.Canceled) ||
 				errors.Is(err, context.DeadlineExceeded) {
-				return "", err
+				return "", sanitizeAPIError(err, key)
 			}
 			lastErr = fmt.Errorf(
 				"failed to download %s, api request failed: %w", mediaURL,
