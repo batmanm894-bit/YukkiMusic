@@ -359,7 +359,17 @@ func (s *SpotifyPlatform) convertSpotifyTrack(
 		thumbnail = images[0].URL
 	}
 
+	artistNames := make([]string, 0, len(simpleTrack.Artists))
+	for _, a := range simpleTrack.Artists {
+		if a.Name != "" {
+			artistNames = append(artistNames, a.Name)
+		}
+	}
+
 	title := simpleTrack.Name
+	if len(artistNames) > 0 {
+		title = title + " - " + strings.Join(artistNames, ", ")
+	}
 	duration := int(simpleTrack.Duration) / 1000
 
 	track := &state.Track{
