@@ -212,7 +212,7 @@ func validateConfig() error {
 	}
 
 	if SpotifyClientID == "" || SpotifyClientSecret == "" {
-		logger.Warn("Spotify credentials not configured — Spotify links won't work")
+		logger.Warn("Spotify credentials not configured — using free oEmbed fallback (single tracks only; playlists/albums/artists need SPOTIFY_CLIENT_ID/SPOTIFY_CLIENT_SECRET with an active Premium account)")
 	}
 
 	return nil
