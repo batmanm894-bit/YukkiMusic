@@ -156,6 +156,31 @@ var handlers = []MsgHandlerDef{
 		Filters: []telegram.Filter{ignoreChannelFilter},
 	},
 	{
+		Pattern: "calc",
+		Handler: calcHandler,
+		Filters: []telegram.Filter{ignoreChannelFilter},
+	},
+	{
+		Pattern: "(font|fontstyle)",
+		Handler: fontHandler,
+		Filters: []telegram.Filter{ignoreChannelFilter},
+	},
+	{
+		Pattern: "fonts",
+		Handler: fontsHandler,
+		Filters: []telegram.Filter{ignoreChannelFilter},
+	},
+	{
+		Pattern: "ton",
+		Handler: tonHandler,
+		Filters: []telegram.Filter{ignoreChannelFilter},
+	},
+	{
+		Pattern: "usdton",
+		Handler: usdTonHandler,
+		Filters: []telegram.Filter{ignoreChannelFilter},
+	},
+	{
 		Pattern: "stats",
 		Handler: statsHandler,
 		Filters: []telegram.Filter{ignoreChannelFilter, sudoOnlyFilter},
