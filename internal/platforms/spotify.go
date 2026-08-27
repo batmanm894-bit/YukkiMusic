@@ -84,20 +84,34 @@ func (s *SpotifyPlatform) GetTracks(
 	query string,
 	video bool,
 ) ([]*state.Track, error) {
-	if config.SpotifyClientID == "" || config.SpotifyClientSecret == "" {
-		return nil, errors.New(
-			"spotify client credentials not configured. Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET",
-		)
-	}
-
 	// Check cache first
 	cacheKey := "spotify:" + strings.ToLower(query)
 	if cached, ok := spotifyCache.Get(cacheKey); ok {
 		return updateVideoFlag(cached, video), nil
 	}
 
+	// No official credentials configured, or the official Web API is
+	// unavailable (e.g. Spotify's "Active premium subscription required
+	// for the owner of the app" restriction) — fall back to the public,
+	// no-auth oEmbed/page-metadata resolver. This only works for single
+	// track links; playlists/albums/artists still need the official API.
+	if config.SpotifyClientID == "" || config.SpotifyClientSecret == "" {
+		tracks, err := s.getTrackViaOEmbed(query)
+		if err != nil {
+			return nil, err
+		}
+		if len(tracks) > 0 {
+			spotifyCache.Set(cacheKey, tracks)
+		}
+		return updateVideoFlag(tracks, video), nil
+	}
+
 	// Initialize client if needed
 	if err := s.ensureClient(); err != nil {
+		if fb, fbErr := s.getTrackViaOEmbed(query); fbErr == nil {
+			spotifyCache.Set(cacheKey, fb)
+			return updateVideoFlag(fb, video), nil
+		}
 		return nil, fmt.Errorf("failed to initialize Spotify client: %w", err)
 	}
 
@@ -112,6 +126,14 @@ func (s *SpotifyPlatform) GetTracks(
 	) > 1 {
 		trackID := spotify.ID(matches[1])
 		tracks, err = s.getTrack(ctx, trackID)
+		if err != nil {
+			// Official API failed (e.g. "Active premium subscription
+			// required for the owner of the app"). Fall back to the
+			// no-auth oEmbed resolver so single-track links keep working.
+			if fb, fbErr := s.getTrackViaOEmbed(query); fbErr == nil {
+				tracks, err = fb, nil
+			}
+		}
 	} else if matches := spotifyPlaylistRegex.FindStringSubmatch(query); len(matches) > 1 {
 		playlistID := spotify.ID(matches[1])
 		tracks, err = s.getPlaylist(ctx, playlistID)
@@ -217,6 +239,88 @@ func (s *SpotifyPlatform) Download(
 	}
 
 	return "", errors.New("no YouTube downloader available")
+}
+
+// spotifyOEmbedResponse mirrors the fields we need from Spotify's public,
+// no-authentication oEmbed endpoint (https://open.spotify.com/oembed).
+type spotifyOEmbedResponse struct {
+	Title        string `json:"title"`
+	ThumbnailURL string `json:"thumbnail_url"`
+}
+
+var (
+	ogTitleRegex = regexp.MustCompile(
+		`(?i)<meta\s+property="og:title"\s+content="([^"]*)"`,
+	)
+)
+
+// getTrackViaOEmbed resolves a single Spotify track link into a playable
+// Track WITHOUT needing SPOTIFY_CLIENT_ID/SECRET or a Premium developer
+// account. It only supports individual track links (not playlists, albums,
+// or artists — those still require the official Web API).
+//
+// It combines two public, unauthenticated sources:
+//  1. Spotify's oEmbed endpoint — gives a clean title + thumbnail.
+//  2. The public track page's og:title meta tag — usually formatted as
+//     "<Song> - song by <Artist> | Spotify", which gives us the artist
+//     name for a much more accurate YouTube search later in Download().
+func (s *SpotifyPlatform) getTrackViaOEmbed(
+	query string,
+) ([]*state.Track, error) {
+	matches := spotifyTrackRegex.FindStringSubmatch(query)
+	if len(matches) < 2 {
+		return nil, errors.New(
+			"free Spotify fallback only supports track links (not playlists/albums/artists) — configure SPOTIFY_CLIENT_ID/SPOTIFY_CLIENT_SECRET with an active Premium account for those",
+		)
+	}
+	trackID := matches[1]
+
+	var oembed spotifyOEmbedResponse
+	resp, err := rc.R().
+		SetResult(&oembed).
+		SetQueryParam("url", "https://open.spotify.com/track/"+trackID).
+		Get("https://open.spotify.com/oembed")
+	if err != nil || resp.StatusCode() != 200 {
+		return nil, fmt.Errorf(
+			"failed to resolve Spotify track (free mode): %w",
+			err,
+		)
+	}
+
+	title := strings.TrimSpace(oembed.Title)
+
+	// Try to enrich with the artist name from the public page's og:title,
+	// e.g. "Blinding Lights - song by The Weeknd | Spotify"
+	if pageResp, pageErr := rc.R().
+		SetHeader("User-Agent", "Mozilla/5.0").
+		Get("https://open.spotify.com/track/" + trackID); pageErr == nil &&
+		pageResp.StatusCode() == 200 {
+		if m := ogTitleRegex.FindStringSubmatch(pageResp.String()); len(m) > 1 {
+			og := strings.TrimSpace(m[1])
+			og = strings.TrimSuffix(og, " | Spotify")
+			og = strings.ReplaceAll(og, " - song by ", " - ")
+			og = strings.ReplaceAll(og, " - song and lyrics by ", " - ")
+			if og != "" {
+				title = og
+			}
+		}
+	}
+
+	if title == "" {
+		return nil, errors.New(
+			"could not resolve title for this Spotify track link",
+		)
+	}
+
+	track := &state.Track{
+		ID:      trackID,
+		Title:   title,
+		Artwork: oembed.ThumbnailURL,
+		URL:     "https://open.spotify.com/track/" + trackID,
+		Source:  PlatformSpotify,
+	}
+
+	return []*state.Track{track}, nil
 }
 
 // ensureClient initializes the Spotify client (once)
